@@ -1,0 +1,16 @@
+{
+  "agent_id": "agent-maison",
+  "serveur": "wss://localhost:8443/ws",
+  "empreinte_serveur": "",
+  "ca": "secrets/ca.crt.pem",
+  "certificat": "secrets/agent.crt.pem",
+  "cle_certificat": "secrets/agent.key.pem",
+  "cle_signature": "secrets/agent_ed25519.pem",
+  "machines": [
+    {"id": "kobra-1", "ip": "192.168.1.42", "nom": "Kobra 3 Combo"}
+  ],
+  "console_gcode": false,
+  "enregistrement_auto": true,
+  "enregistrement_timelapse": 10,
+  "limites": {"buse_max": 300, "plateau_max": 110}
+}

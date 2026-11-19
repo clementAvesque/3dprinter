@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "_doc": "Liste FERMÉE des commandes que le serveur peut envoyer à l'agent. Lue par le serveur (validation, rôles) ET par l'agent (qui revalide tout). role = rôle minimum côté API ; confirmation = code 2FA récent exigé ; longue = réponse 202 + opération ; delai_ms = délai de réponse si différent du défaut. Types : texte (max, motif), entier/nombre (min, max), booleen, choix (valeurs). optionnel = peut manquer.",
+  "commandes": {
+    "print.start":     {"role": "operateur", "longue": true,  "params": {"fichier": {"type": "fichier"}, "emplacement": {"type": "entier", "min": 1, "max": 4, "optionnel": true}}},
+    "print.pause":     {"role": "operateur", "params": {}},
+    "print.resume":    {"role": "operateur", "params": {}},
+    "print.cancel":    {"role": "operateur", "confirmation": true, "params": {}},
+    "print.speed":     {"role": "operateur", "params": {"percent": {"type": "entier", "min": 10, "max": 300}}},
+    "print.flow":      {"role": "operateur", "params": {"percent": {"type": "entier", "min": 50, "max": 150}}},
+
+    "temperature.set": {"role": "operateur", "params": {"cible": {"type": "choix", "valeurs": ["buse", "plateau"]}, "temp": {"type": "nombre", "min": 0, "max": 300}}},
+    "move.home":       {"role": "operateur", "longue": true,  "params": {"axes": {"type": "texte", "max": 3, "motif": "^[XYZ]{0,3}$", "optionnel": true}}},
+    "move.jog":        {"role": "operateur", "params": {"x": {"type": "nombre", "min": -300, "max": 300, "optionnel": true}, "y": {"type": "nombre", "min": -300, "max": 300, "optionnel": true}, "z": {"type": "nombre", "min": -300, "max": 300, "optionnel": true}, "relatif": {"type": "booleen", "optionnel": true}}},
+    "motors.off":      {"role": "operateur", "params": {}},
+    "fan.set":         {"role": "operateur", "params": {"percent": {"type": "entier", "min": 0, "max": 100}}},
+    "light.set":       {"role": "operateur", "params": {"on": {"type": "booleen"}}},
+    "filament.load":   {"role": "operateur", "longue": true,  "params": {"emplacement": {"type": "entier", "min": 1, "max": 4, "optionnel": true}, "temp": {"type": "nombre", "min": 150, "max": 300, "optionnel": true}}},
+    "filament.unload": {"role": "operateur", "longue": true,  "params": {"emplacement": {"type": "entier", "min": 1, "max": 4, "optionnel": true}, "temp": {"type": "nombre", "min": 150, "max": 300, "optionnel": true}}},
+    "ace.dry.start":   {"role": "operateur", "params": {"temp": {"type": "nombre", "min": 30, "max": 70}, "duree": {"type": "entier", "min": 10, "max": 1440}}},
+    "ace.dry.stop":    {"role": "operateur", "params": {}},
+    "gcode.raw":       {"role": "admin", "confirmation": true, "params": {"script": {"type": "texte", "max": 500, "motif": "^[\\x20-\\x7E\\n]+$"}}},
+
+    "files.list":      {"role": "lecteur", "params": {}},
+    "files.sync":      {"role": "operateur", "longue": true, "params": {}},
+    "file.upload":     {"role": "operateur", "longue": true, "params": {"fichier": {"type": "fichier"}, "taille": {"type": "entier", "min": 1, "max": 209715200}, "sha256": {"type": "texte", "max": 64, "motif": "^[0-9a-f]{64}$"}, "transfert": {"type": "texte", "max": 40, "motif": "^[A-Za-z0-9_-]+$"}}},
+    "file.delete":     {"role": "operateur", "confirmation": true, "params": {"fichier": {"type": "fichier"}}},
+    "file.thumbnail":  {"role": "lecteur", "params": {"fichier": {"type": "fichier"}}},
+    "file.toolpath":   {"role": "lecteur", "delai_ms": 120000, "params": {"fichier": {"type": "fichier"}}},
+
+    "camera.snapshot": {"role": "lecteur", "params": {}},
+    "camera.stream":   {"role": "lecteur", "params": {"actif": {"type": "booleen"}}},
+    "record.start":    {"role": "operateur", "params": {"timelapse": {"type": "nombre", "min": 1, "max": 600, "optionnel": true}}},
+    "record.stop":     {"role": "operateur", "params": {}},
+    "record.auto":     {"role": "operateur", "params": {"actif": {"type": "booleen"}, "timelapse": {"type": "nombre", "min": 1, "max": 600, "optionnel": true}}},
+    "record.list":     {"role": "lecteur", "params": {}},
+    "record.download": {"role": "lecteur", "delai_ms": 600000, "params": {"nom": {"type": "video"}}},
+    "record.delete":   {"role": "operateur", "confirmation": true, "params": {"nom": {"type": "video"}}},
+
+    "history.machine": {"role": "lecteur", "delai_ms": 30000, "params": {}}
+  },
+  "types": {
+    "fichier": {"type": "texte", "max": 255, "motif": "^(?!.*\\.\\.)(?![/\\\\])[^\\x00-\\x1f<>:\"|?*\\\\]+\\.(gcode|g|gco)$"},
+    "video":   {"type": "texte", "max": 200, "motif": "^[A-Za-z0-9_.-]+\\.mp4$"}
+  },
+  "limites": {
+    "message_json_octets": 65536,
+    "morceau_octets": 1048576,
+    "horloge_tolerance_ms": 30000,
+    "defi_validite_ms": 10000,
+    "ping_ms": 15000,
+    "coupure_ms": 45000,
+    "reponse_ms": 15000,
+    "reponse_longue_ms": 600000,
+    "commandes_par_minute": 120
+  }
+}

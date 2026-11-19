@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Galerie 3D</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script type="importmap">
+    { "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    } }
+  </script>
+</head>
+<body>
+
+{% include "_entete.html" %}
+
+<main class="galerie">
+
+  <section class="resume">
+    <div class="tuile"><span class="muted small">Pièces</span><b id="r-pieces">—</b></div>
+    <div class="tuile"><span class="muted small">Impressions terminées</span><b id="r-prints">—</b></div>
+    <div class="tuile"><span class="muted small">Filament utilisé</span><b id="r-filament">—</b></div>
+    <div class="tuile"><span class="muted small">Temps d'impression</span><b id="r-temps">—</b></div>
+  </section>
+
+  <div class="barre-outils">
+    <input id="recherche" type="search" class="grow" placeholder="Rechercher une pièce…" autocomplete="off">
+    <select id="tri">
+      <option value="nom">Nom</option>
+      <option value="imprimes">Plus imprimées</option>
+      <option value="recent">Imprimées récemment</option>
+      <option value="poids">Plus lourdes</option>
+      <option value="temps">Plus longues</option>
+    </select>
+    <button id="btn-selection" class="ghost">Sélectionner</button>
+  </div>
+
+  <div id="barre-selection" class="barre-selection" hidden>
+    <b id="sel-nb">0 sélectionnée</b>
+    <button id="sel-tout" class="ghost">Tout sélectionner</button>
+    <span class="grow"></span>
+    <button id="sel-annuler" class="ghost">Annuler</button>
+    <button id="sel-supprimer" class="danger" disabled>Supprimer</button>
+  </div>
+
+  <div id="cartes" class="cartes"></div>
+
+  <section class="card">
+    <h2>Historique des impressions</h2>
+    <div class="tableau">
+      <table>
+        <thead><tr><th>Pièce</th><th>Date</th><th>Durée</th><th>Filament</th><th>Statut</th></tr></thead>
+        <tbody id="historique"></tbody>
+      </table>
+    </div>
+  </section>
+
+</main>
+
+<!-- fiche d'une pièce -->
+<dialog id="fiche" class="fiche">
+  <div class="fiche-tete">
+    <h2 id="f-nom" class="titre-fichier"></h2>
+    <button id="f-fermer" class="ghost" aria-label="Fermer">✕</button>
+  </div>
+  <div class="fiche-corps">
+    <div class="vue3d" id="f-vue">
+      <div class="outils">
+        <button class="ghost" data-vue="iso">3D</button>
+        <button class="ghost" data-vue="dessus">Dessus</button>
+        <button class="ghost" data-vue="face">Face</button>
+      </div>
+      <div id="f-message" class="vue-message muted"></div>
+      <div class="curseur">
+        <span class="muted small">Couche</span>
+        <input id="f-couche" type="range" min="0" max="0" value="0" disabled>
+        <b id="f-couche-txt" class="mono">—</b>
+      </div>
+    </div>
+    <div class="fiche-infos">
+      <div class="stats">
+        <div><span class="muted">Durée estimée</span><b id="f-temps">—</b></div>
+        <div><span class="muted">Filament</span><b id="f-poids">—</b></div>
+        <div><span class="muted">Fichier</span><b id="f-taille">—</b></div>
+        <div><span class="muted">Couches</span><b id="f-couches">—</b></div>
+        <div><span class="muted">Imprimée</span><b id="f-nb">—</b></div>
+        <div><span class="muted">Dernière fois</span><b id="f-derniere">—</b></div>
+      </div>
+      <div class="fil-bloc">
+        <span class="muted small">Fil prévu par le fichier</span>
+        <div id="f-fil" class="fil-liste"></div>
+      </div>
+      <p id="f-conseil" class="small conseil" hidden></p>
+      <div class="row">
+        <select id="f-slot">
+          <option value="">Par défaut (emplacement 1)</option>
+          <option value="1">ACE slot 1</option>
+          <option value="2">ACE slot 2</option>
+          <option value="3">ACE slot 3</option>
+          <option value="4">ACE slot 4</option>
+        </select>
+        <button id="f-imprimer" class="primary">Imprimer</button>
+      </div>
+      <a id="f-suivi" class="lien" href="/suivi">Ouvrir dans Suivi 3D →</a>
+      <button id="f-supprimer" class="danger supprimer">Supprimer ce gcode</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- confirmation de suppression (une ou plusieurs pièces) -->
+<dialog id="confirmation" class="confirmation">
+  <form method="dialog">
+    <h2 id="c-titre">Supprimer ?</h2>
+    <ul id="c-liste" class="c-liste"></ul>
+    <p class="muted small">Le gcode est supprimé de l'imprimante et de ce PC, avec sa miniature et son
+      aperçu 3D. C'est définitif. L'historique des impressions, lui, est conservé.</p>    <div class="row fin">
+      <button value="non" class="ghost">Annuler</button>
+      <button value="oui" id="c-ok" class="danger plein">Supprimer</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="toasts" class="toasts"></div>
+
+<script src="{{ url_for('static', filename='commun.js') }}"></script>
+<script src="{{ url_for('static', filename='filament.js') }}"></script>
+<script type="module" src="{{ url_for('static', filename='galerie.js') }}"></script>
+</body>
+</html>

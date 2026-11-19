@@ -1,0 +1,15 @@
+<header class="topbar">
+  <div class="brand">
+    <span id="dot" class="dot"></span>
+    <div>
+      <h1>Imprimante 3D</h1>
+      <span class="muted mono">{{ ip }}</span>
+    </div>
+  </div>
+  <nav class="nav">
+    <a href="/" {% if page == "accueil" %}class="actif" aria-current="page"{% endif %}>Tableau de bord</a>
+    <a href="/suivi" {% if page == "suivi" %}class="actif" aria-current="page"{% endif %}>Suivi 3D</a>
+    <a href="/galerie" {% if page == "galerie" %}class="actif" aria-current="page"{% endif %}>Galerie</a>
+  </nav>
+  <span id="badge" class="badge">…</span>
+</header>

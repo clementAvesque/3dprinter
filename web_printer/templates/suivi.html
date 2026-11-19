@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Suivi 3D</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script type="importmap">
+    { "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    } }
+  </script>
+</head>
+<body>
+
+{% include "_entete.html" %}
+
+<main class="suivi">
+
+  <section class="vue3d" id="vue">
+    <div class="outils">
+      <button class="ghost" data-vue="iso">3D</button>
+      <button class="ghost" data-vue="dessus">Dessus</button>
+      <button class="ghost" data-vue="face">Face</button>
+    </div>
+    <div id="vue-message" class="vue-message muted">Aucune impression en cours : choisis un fichier à droite.</div>
+    <div class="curseur">
+      <span class="muted small">Couche</span>
+      <input id="couche" type="range" min="0" max="0" value="0" disabled>
+      <b id="couche-txt" class="mono">—</b>
+    </div>
+  </section>
+
+  <aside class="panneau">
+    <section class="card">
+      <div class="card-head">
+        <h2>Impression</h2>
+        <label class="small muted interrupteur"><input id="direct" type="checkbox" checked> Suivre en direct</label>
+      </div>
+      <p id="fichier" class="titre-fichier">Aucune impression</p>
+      <div class="barre"><div id="barre"></div></div>
+      <div class="stats">
+        <div><span class="muted">Avancement</span><b id="pct">—</b></div>
+        <div><span class="muted">Couche</span><b id="couche-impr">—</b></div>
+        <div><span class="muted">Écoulé</span><b id="ecoule">—</b></div>
+        <div><span class="muted">Restant</span><b id="restant">—</b></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Filament</h2>
+      <div class="fil-bloc">
+        <span class="muted small">Prévu par le fichier</span>
+        <div id="fil-prevu" class="fil-liste">—</div>
+      </div>
+      <div class="fil-bloc">
+        <span class="muted small">Utilisé</span>
+        <div id="fil-utilise" class="fil-liste">—</div>
+      </div>
+      <p id="fil-alerte" class="alerte small" hidden></p>
+    </section>
+
+    <section class="card">
+      <h2>Buse</h2>
+      <p class="mono position">X <b id="bx">—</b> · Y <b id="by">—</b> · Z <b id="bz">—</b></p>
+      <div class="stats">
+        <div><span class="muted">Buse</span><b id="t-buse">—</b></div>
+        <div><span class="muted">Plateau</span><b id="t-lit">—</b></div>
+        <div><span class="muted">Vitesse</span><b id="vitesse">—</b></div>
+        <div><span class="muted">Ventilateur</span><b id="ventilo">—</b></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Fichier affiché</h2>
+      <select id="choix"></select>
+      <p id="infos" class="muted small"></p>
+      <ul id="legende" class="legende-types"></ul>
+    </section>
+  </aside>
+
+</main>
+
+<div id="toasts" class="toasts"></div>
+
+<script src="{{ url_for('static', filename='commun.js') }}"></script>
+<script src="{{ url_for('static', filename='filament.js') }}"></script>
+<script type="module" src="{{ url_for('static', filename='suivi.js') }}"></script>
+</body>
+</html>

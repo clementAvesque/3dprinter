@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Imprimante 3D</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+{% include "_entete.html" %}
+
+<div id="tache" class="tache" hidden></div>
+
+<main class="grid">
+
+  <!-- Caméra -->
+  <section class="card span-2">
+    <div class="card-head">
+      <h2>Caméra</h2>
+      <div class="row">
+        <button class="ghost" data-light="1">💡 Allumer</button>
+        <button class="ghost" data-light="0">Éteindre</button>
+      </div>
+    </div>
+    <div class="cam">
+      <img id="cam" alt="flux caméra">
+      <span id="cam-off" class="muted" hidden>Caméra indisponible, nouvel essai dans 15 s</span>
+      <span id="rec-badge" class="rec-badge" hidden>● REC <span id="rec-duree"></span></span>
+    </div>
+    <div class="row">
+      <select id="rec-mode" title="type d'enregistrement">
+        <option value="10">Timelapse : 1 image / 10 s</option>
+        <option value="30">Timelapse : 1 image / 30 s</option>
+        <option value="">Vidéo temps réel</option>
+      </select>
+      <label class="check"><input id="rec-auto" type="checkbox" checked> Arrêt auto à la fin du print</label>
+      <button id="btn-rec" class="rec">⏺ Enregistrer</button>
+    </div>
+    <label class="check"><input id="rec-chaque" type="checkbox" checked> Enregistrer automatiquement chaque impression <span id="rec-chaque-mode" class="muted small"></span></label>
+    <details>
+      <summary>Vidéos enregistrées (<span id="videos-nb">0</span>)</summary>
+      <ul id="videos" class="liste videos"></ul>
+    </details>
+  </section>
+
+  <!-- Impression en cours -->
+  <section class="card">
+    <h2>Impression</h2>
+    <p id="pr-fichier" class="titre-fichier">Aucune impression</p>
+    <div id="pr-fil" class="fil-resume" hidden>
+      <div><span class="muted small">Fil prévu</span><div id="pr-fil-prevu" class="fil-liste"></div></div>
+      <div><span class="muted small">Fil utilisé</span><div id="pr-fil-utilise" class="fil-liste"></div></div>
+      <p id="pr-fil-alerte" class="alerte small" hidden></p>
+    </div>
+    <div class="barre"><div id="pr-barre"></div></div>
+    <div class="stats">
+      <div><span class="muted">Avancement</span><b id="pr-pct">—</b></div>
+      <div><span class="muted">Couche</span><b id="pr-couche">—</b></div>
+      <div><span class="muted">Écoulé</span><b id="pr-ecoule">—</b></div>
+      <div><span class="muted">Restant</span><b id="pr-restant">—</b></div>
+    </div>
+    <div class="row">
+      <button id="btn-pause">⏸ Pause</button>
+      <button id="btn-reprise">▶ Reprendre</button>
+      <button id="btn-annuler" class="danger">✕ Annuler</button>
+    </div>
+    <label class="slider">Vitesse <b id="v-speed">100 %</b>
+      <input id="speed" type="range" min="10" max="300" step="5" value="100">
+    </label>
+    <label class="slider">Débit <b id="v-flow">100 %</b>
+      <input id="flow" type="range" min="50" max="150" step="1" value="100">
+    </label>
+    <label class="slider">Ventilateur <b id="v-fan">0 %</b>
+      <input id="fan" type="range" min="0" max="100" step="5" value="0">
+    </label>
+  </section>
+
+  <!-- Températures -->
+  <section class="card">
+    <h2>Températures</h2>
+    <div class="temp">
+      <div>
+        <span class="muted">Buse</span>
+        <b><span id="t-buse">—</span> °C</b>
+        <span class="muted small">cible <span id="c-buse">off</span></span>
+      </div>
+      <form class="row" data-chauffe="nozzle">
+        <input type="number" min="0" max="300" placeholder="210" required>
+        <button>Chauffer</button>
+        <button type="button" class="ghost" data-off>Off</button>
+      </form>
+    </div>
+    <div class="temp">
+      <div>
+        <span class="muted">Plateau</span>
+        <b><span id="t-lit">—</span> °C</b>
+        <span class="muted small">cible <span id="c-lit">off</span></span>
+      </div>
+      <form class="row" data-chauffe="bed">
+        <input type="number" min="0" max="110" placeholder="60" required>
+        <button>Chauffer</button>
+        <button type="button" class="ghost" data-off>Off</button>
+      </form>
+    </div>
+    <canvas id="graph" height="140"></canvas>
+    <div class="legende"><span class="l-buse">Buse</span><span class="l-lit">Plateau</span></div>
+  </section>
+
+  <!-- Fichiers -->
+  <section class="card">
+    <h2>Fichiers</h2>
+    <form id="upload" class="row">
+      <input id="upload-fichier" type="file" accept=".gcode" required>
+      <button>Envoyer</button>
+    </form>
+    <ul id="gcodes" class="liste"></ul>
+    <div class="row">
+      <select id="slot">
+        <option value="">Par défaut (emplacement 1)</option>
+        <option value="1">ACE slot 1</option>
+        <option value="2">ACE slot 2</option>
+        <option value="3">ACE slot 3</option>
+        <option value="4">ACE slot 4</option>
+      </select>
+      <button id="btn-imprimer" class="primary">Imprimer</button>
+    </div>
+  </section>
+
+  <!-- ACE -->
+  <section class="card">
+    <div class="card-head">
+      <h2>ACE</h2>
+      <span id="ace-etat" class="badge petit">—</span>
+    </div>
+    <div id="slots" class="slots"></div>
+    <div class="row">
+      <input id="dry-temp" type="number" value="50" min="30" max="70" title="°C">
+      <input id="dry-duree" type="number" value="240" min="10" max="1440" title="minutes">
+      <button id="btn-dry">Sécher</button>
+      <button id="btn-dry-stop" class="ghost">Stop</button>
+    </div>
+    <p class="muted small">Séchage : température en °C, durée en minutes.</p>
+  </section>
+
+  <!-- Mouvements -->
+  <section class="card">
+    <h2>Mouvements</h2>
+    <p class="mono">X <b id="pos-x">—</b> · Y <b id="pos-y">—</b> · Z <b id="pos-z">—</b></p>
+    <div class="row">
+      <button data-home="">⌂ Home</button>
+      <button class="ghost" data-home="XY">XY</button>
+      <button class="ghost" data-home="Z">Z</button>
+    </div>
+    <div class="jog">
+      <button data-jog="y" data-dir="1">Y+</button>
+      <button data-jog="x" data-dir="-1">X−</button>
+      <button data-jog="x" data-dir="1">X+</button>
+      <button data-jog="y" data-dir="-1">Y−</button>
+      <button data-jog="z" data-dir="1">Z+</button>
+      <button data-jog="z" data-dir="-1">Z−</button>
+    </div>
+    <div class="row">
+      <span class="muted">Pas</span>
+      <select id="pas">
+        <option>0.1</option><option>1</option><option selected>10</option><option>50</option>
+      </select>
+      <span class="muted">mm</span>
+      <button id="btn-moteurs" class="ghost">Couper moteurs</button>
+    </div>
+  </section>
+
+  <!-- Filament -->
+  <section class="card">
+    <h2>Filament</h2>
+    <div class="row">
+      <select id="fil-slot">
+        <option value="">Sans ACE</option>
+        <option value="1">Slot 1</option><option value="2">Slot 2</option>
+        <option value="3">Slot 3</option><option value="4">Slot 4</option>
+      </select>
+      <input id="fil-temp" type="number" value="220" min="150" max="300" title="°C">
+    </div>
+    <div class="row">
+      <button id="btn-charger">Charger</button>
+      <button id="btn-decharger">Décharger</button>
+    </div>
+    <div class="row">
+      <button class="ghost" data-extrude="10">+10 mm</button>
+      <button class="ghost" data-extrude="-10">−10 mm</button>
+    </div>
+    <p class="muted small">Refusé pendant une impression. La buse doit être chaude pour extruder.</p>
+  </section>
+
+  <!-- Console -->
+  <section class="card span-2">
+    <h2>Console gcode</h2>
+    <form id="console" class="row">
+      <input id="console-cmd" class="mono grow" placeholder="ex. M115" autocomplete="off" required>
+      <button>Envoyer</button>
+    </form>
+    <pre id="console-log" class="log"></pre>
+  </section>
+
+</main>
+
+<div id="toasts" class="toasts"></div>
+
+<script src="{{ url_for('static', filename='filament.js') }}"></script>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
