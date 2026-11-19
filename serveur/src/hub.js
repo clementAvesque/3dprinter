@@ -6,9 +6,14 @@
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const https = require('node:https');
+const net = require('node:net');
 const { EventEmitter } = require('node:events');
 const { WebSocketServer } = require('ws');
 const { COMMANDES, LIMITES, valider } = require('./protocole');
+const { lirePki } = require('./config');
+
+// PROXY protocol v1 : "PROXY TCP4 <ip source> <ip dest> <port source> <port dest>\r\n" (107 octets max)
+const PROXY_RE = /^PROXY (TCP4|TCP6) ([0-9a-fA-F.:]+) ([0-9a-fA-F.:]+) (\d{1,5}) (\d{1,5})$/;
 
 const ID_RE = /^[A-Za-z0-9_-]{8,40}$/;
 const MACHINE_RE = /^[A-Za-z0-9_-]{1,40}$/;
@@ -53,17 +58,24 @@ class Hub extends EventEmitter {
     this.echecs = new Map();         // ip -> [horodatages d'échec] (bannissement)
     this.connecteDepuis = null;
     this.ipAgent = null;
+    this.ipsReelles = new Map();     // derrière un proxy : port local du relais interne -> vraie IP
+  }
+
+  // adresse réelle d'une connexion : celle annoncée par le proxy (PROXY protocol), sinon celle du socket
+  _ip(socket) {
+    if (this.config.agent.proxyProtocol) return this.ipsReelles.get(socket.remotePort) || 'inconnue';
+    return ipPropre(socket.remoteAddress);
   }
 
   // ---------------------------------------------------------------- démarrage
 
   demarrer() {
-    const cert = fs.readFileSync(this.config.pki.cert);
+    const cert = lirePki(this.config, 'cert');
     this.empreinteServeur = crypto.createHash('sha256').update(new crypto.X509Certificate(cert).raw).digest('hex');
     this.serveur = https.createServer({
-      key: fs.readFileSync(this.config.pki.cle),
+      key: lirePki(this.config, 'cle'),
       cert,
-      ca: fs.readFileSync(this.config.pki.ca),
+      ca: lirePki(this.config, 'ca'),
       requestCert: true,               // certificat client exigé...
       rejectUnauthorized: true,        // ...et signé par NOTRE autorité, sinon la poignée TLS échoue
       minVersion: 'TLSv1.3',
@@ -75,23 +87,80 @@ class Hub extends EventEmitter {
     });
     this.serveur.on('upgrade', (req, socket, head) => this._upgrade(req, socket, head));
     // une IP bannie est coupée dès la connexion TCP, avant même la poignée TLS
-    this.serveur.on('connection', (socket) => { if (this._banni(ipPropre(socket.remoteAddress))) socket.destroy(); });
-    this.serveur.on('tlsClientError', (err, socket) => this._echec(socket.remoteAddress, `TLS : ${err.code || err.message}`));
+    // (derrière un proxy, c'est le relais qui s'en charge : voir _entreeProxy)
+    this.serveur.on('connection', (socket) => {
+      if (!this.config.agent.proxyProtocol && this._banni(this._ip(socket))) { socket.coupeCarBanni = true; socket.destroy(); }
+    });
+    this.serveur.on('tlsClientError', (err, socket) => {
+      // socket déjà coupée car bannie (comptée), ou disparue : pas d'échec en double dans le journal
+      if (socket.coupeCarBanni || socket._parent?.coupeCarBanni || !socket.remotePort) return;
+      const conseil = err.code === 'ERR_SSL_HTTP_REQUEST' ? ' (requête http:// en clair : ce port est réservé à l\'agent)' : '';
+      this._echec(this._ip(socket), `TLS : ${err.code || err.message}${conseil}`);
+    });
     this.serveur.headersTimeout = 10000;
     this.serveur.requestTimeout = 10000;
-    this._pingTimer = setInterval(() => this._ping(), LIMITES.ping_ms);
-    return new Promise((ok) => this.serveur.listen(this.config.agent.port, this.config.agent.hote, ok));
+    const ecouter = (serveur, port, hote) => new Promise((ok, ko) => {
+      serveur.once('error', ko);                 // ex. port déjà utilisé : erreur remontée, pas de plantage brut
+      serveur.listen(port, hote, () => { serveur.off('error', ko); ok(); });
+    });
+    const demarrage = this.config.agent.proxyProtocol
+      // derrière un proxy TCP : le relais écoute le port public, le serveur TLS n'écoute que la machine
+      ? ecouter(this.serveur, 0, '127.0.0.1').then(() => {
+        this.relais = net.createServer((socket) => this._entreeProxy(socket));
+        return ecouter(this.relais, this.config.agent.port, this.config.agent.hote);
+      })
+      : ecouter(this.serveur, this.config.agent.port, this.config.agent.hote);
+    return demarrage.then(() => { this._pingTimer = setInterval(() => this._ping(), LIMITES.ping_ms); });
+  }
+
+  // derrière un proxy (Fly.io) : lit l'en-tête PROXY protocol (vraie IP de l'agent), applique le
+  // bannissement et la liste d'IP autorisées, puis relaie le flux TLS intact vers le serveur interne
+  _entreeProxy(socket) {
+    let tampon = Buffer.alloc(0);
+    socket.on('error', () => {});
+    const delai = setTimeout(() => socket.destroy(), 5000);
+    const lire = (morceau) => {
+      tampon = Buffer.concat([tampon, morceau]);
+      const fin = tampon.indexOf('\r\n');
+      if (fin < 0) { if (tampon.length > 107) socket.destroy(); return; }
+      socket.off('data', lire);
+      socket.pause();
+      clearTimeout(delai);
+      const m = PROXY_RE.exec(tampon.subarray(0, fin).toString('latin1'));
+      if (!m) return socket.destroy();          // connexion qui ne vient pas du proxy : refusée
+      const ip = ipPropre(m[2]);
+      if (this._banni(ip)) return socket.destroy();
+      const ips = this.config.agent.ipsAutorisees;
+      if (ips.length && !ips.includes(ip)) { this._echec(ip, 'ip non autorisée'); return socket.destroy(); }
+      const interne = net.connect(this.serveur.address().port, '127.0.0.1');
+      interne.on('error', () => socket.destroy());
+      interne.on('connect', () => {
+        const cle = interne.localPort;
+        this.ipsReelles.set(cle, ip);
+        interne.on('close', () => { this.ipsReelles.delete(cle); socket.destroy(); });
+        socket.on('close', () => interne.destroy());
+        interne.write(tampon.subarray(fin + 2));
+        socket.pipe(interne);
+        interne.pipe(socket);
+        socket.resume();
+      });
+    };
+    socket.on('data', lire);
   }
 
   arreter() {
     clearInterval(this._pingTimer);
     if (this.lien) this.lien.ws.terminate();
     if (this.candidat) this.candidat.ws.terminate();
-    return new Promise((ok) => this.serveur.close(() => ok()));
+    const fermer = (s) => (s ? new Promise((ok) => s.close(() => ok())) : Promise.resolve());
+    return Promise.all([fermer(this.serveur), fermer(this.relais)]);
   }
 
   _banni(ip) {
-    const { echecs, dureeMs } = this.config.agent.bannissement;
+    const { echecs, dureeMs, exempterLocal } = this.config.agent.bannissement;
+    // le PC lui-même (127.0.0.1) n'est jamais banni : un navigateur ouvert par erreur sur ce port
+    // bannirait sinon l'agent qui tourne sur la même machine. Ses échecs restent journalisés.
+    if (exempterLocal && ['127.0.0.1', '::1'].includes(ip)) return false;
     const t = (this.echecs.get(ip) || []).filter((x) => Date.now() - x < dureeMs);
     this.echecs.set(ip, t);
     return t.length >= echecs;
@@ -106,7 +175,7 @@ class Hub extends EventEmitter {
   }
 
   _upgrade(req, socket, head) {
-    const ip = ipPropre(socket.remoteAddress);
+    const ip = this._ip(socket);
     const refuser = (code, raison) => {
       this._echec(ip, raison);
       socket.end(`HTTP/1.1 ${code} Refuse\r\nConnection: close\r\n\r\n`);
@@ -119,8 +188,14 @@ class Hub extends EventEmitter {
     if (!socket.authorized || !cert || cert.subject?.CN !== this.config.agent.id) {
       return refuser(403, `certificat client refusé (${cert?.subject?.CN || 'aucun'})`);
     }
-    if (this.lien) return refuser(409, 'un agent est déjà connecté');
-    if (this.candidat) return refuser(409, 'authentification déjà en cours');
+    // place prise : ce n'est PAS un échec (bon certificat), sinon l'agent légitime qui réessaie pendant
+    // qu'une ancienne connexion traîne finirait banni. On vérifie aussitôt si l'agent en place répond.
+    const occupe = (raison) => {
+      this.journal('agent.refus', { ip, resultat: 'refuse', detail: raison });
+      socket.end('HTTP/1.1 409 Conflict\r\nConnection: close\r\n\r\n');
+    };
+    if (this.lien) { this._sonder(this.lien); return occupe('un agent est déjà connecté'); }
+    if (this.candidat) return occupe('authentification déjà en cours');
     this.wss.handleUpgrade(req, socket, head, (ws) => this._accueillir(ws, ip, cert.subject.CN));
   }
 
@@ -166,6 +241,22 @@ class Hub extends EventEmitter {
     for (const m of this.machines.values()) m.enLigne = false;
     this.journal('agent.deconnexion', { ip: c.ip, resultat: 'ok' });
     this.emit('agent', this.statut());
+  }
+
+  // l'agent en place répond-il encore ? (connexion fantôme : agent arrêté net, derrière un proxy qui
+  // n'a pas encore fermé) -> sans « pong » sous 5 s, il est coupé et la place se libère
+  _sonder(c) {
+    if (c.sondage) return;
+    c.sondage = true;
+    const avant = c.dernierPong;
+    try { c.ws.ping(); } catch { /* déjà fermé */ }
+    setTimeout(() => {
+      c.sondage = false;
+      if (this.lien === c && c.dernierPong === avant) {
+        this.journal('agent.coupure', { ip: c.ip, resultat: 'erreur', detail: 'ne répond plus (un autre agent attend)' });
+        c.ws.terminate();
+      }
+    }, 5000).unref();
   }
 
   _ping() {

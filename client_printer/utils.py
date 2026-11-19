@@ -6,6 +6,7 @@ Elles ne lèvent jamais d'exception : on teste simplement `if res.get("error")`.
 
 import json
 import os
+import time
 
 from .config import MOONRAKER_PORT
 
@@ -147,4 +148,13 @@ def save_json(chemin, data):
     tmp = chemin + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
-    os.replace(tmp, chemin)
+    # sous Windows, l'antivirus ou l'indexeur relit souvent le fichier juste après son écriture et
+    # le verrouille un instant : le remplacement échoue alors avec "Accès refusé". On réessaie.
+    for essai in range(10):
+        try:
+            os.replace(tmp, chemin)
+            return
+        except PermissionError:
+            if essai == 9:
+                raise
+            time.sleep(0.05 * (essai + 1))

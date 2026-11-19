@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Imprimer · Imprimantes</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="barre">
+  <div class="marque">
+    <span id="point" class="point"></span>
+    <div>
+      <h1>Imprimantes</h1>
+      <span id="agent-etat" class="muted small">connexion…</span>
+    </div>
+  </div>
+  <select id="machine" title="machine" hidden></select>
+  <span id="badge" class="badge">…</span>
+  <a id="utilisateur" class="small lien-profil" href="profil.html" title="Mon profil"></a>
+  <button id="deconnexion" class="fantome">Se déconnecter</button>
+</header>
+
+<main class="grille">
+
+  <section class="card">
+    <div class="card-tete">
+      <h2>Caméra</h2>
+      <div class="outils">
+        <button id="btn-photo" class="fantome">Photo</button>
+        <button id="btn-direct" class="fantome">Voir en direct</button>
+      </div>
+    </div>
+    <div class="camera">
+      <img id="cam" alt="caméra de l'imprimante" hidden>
+      <span id="cam-vide" class="vide">Le direct utilise ta connexion internet à la maison :<br>lance-le quand tu en as besoin.</span>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-tete">
+      <h2>Impression</h2>
+      <span id="fil" class="muted small"></span>
+    </div>
+    <p id="pr-fichier" class="fichier-en-cours">Aucune impression</p>
+    <div class="progression"><div id="pr-barre"></div></div>
+    <div class="stats">
+      <div>Avancement<b id="pr-pct">—</b></div>
+      <div>Couche<b id="pr-couche">—</b></div>
+      <div>Écoulé<b id="pr-ecoule">—</b></div>
+      <div>Restant<b id="pr-restant">—</b></div>
+      <div>Buse<b id="t-buse">—</b></div>
+      <div>Plateau<b id="t-lit">—</b></div>
+      <div>Vitesse<b id="pr-vitesse">—</b></div>
+      <div>Ventilateur<b id="pr-ventilo">—</b></div>
+    </div>
+    <div class="outils">
+      <button id="btn-pause">⏸ Pause</button>
+      <button id="btn-reprise">▶ Reprendre</button>
+      <button id="btn-annuler" class="danger">✕ Annuler</button>
+    </div>
+  </section>
+
+  <section class="card large">
+    <div class="card-tete">
+      <h2>Fichiers <span id="nb-fichiers" class="muted small"></span></h2>
+      <input id="recherche" type="search" class="grow" placeholder="Rechercher un gcode…" autocomplete="off">
+    </div>
+    <form id="envoi" class="envoi">
+      <input id="envoi-fichier" type="file" accept=".gcode,.g,.gco" required>
+      <button class="primaire">Envoyer sur la machine</button>
+    </form>
+    <div id="envoi-barre" class="barre-envoi" hidden><div></div></div>
+    <div id="cartes" class="cartes"></div>
+  </section>
+
+</main>
+
+<!-- pièce choisie : lancement -->
+<div id="panneau" class="panneau-impression" hidden>
+  <span id="choix-nom" class="grow fichier-en-cours"></span>
+  <span id="choix-infos" class="muted small"></span>
+  <select id="emplacement" title="emplacement de l'ACE"></select>
+  <button id="btn-imprimer" class="primaire">Imprimer</button>
+</div>
+
+<!-- confirmation 2FA (actions sensibles) -->
+<dialog id="confirmation">
+  <form id="conf-form" method="dialog">
+    <h2>Confirme avec ton code</h2>
+    <p class="muted small">Action sensible : saisis le code à 6 chiffres de ton application.</p>
+    <input id="conf-code" class="code" inputmode="numeric" autocomplete="one-time-code" maxlength="20" required>
+    <p id="conf-erreur" class="message erreur" hidden></p>
+    <div class="row">
+      <button type="button" class="fantome grow" id="conf-annuler">Annuler</button>
+      <button class="primaire grow" value="ok">Confirmer</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="toasts" class="toasts"></div>
+<script src="config.js"></script>
+<script src="commun.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

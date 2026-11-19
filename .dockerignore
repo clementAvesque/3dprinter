@@ -1,0 +1,10 @@
+# l'image ne contient que le serveur et le protocole commun ; jamais de secrets ni de données
+*
+!serveur/
+!protocole/
+serveur/node_modules
+serveur/pki
+serveur/data
+serveur/config.json
+serveur/test
+serveur/.env

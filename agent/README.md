@@ -29,6 +29,30 @@ python agent.py
 
 Journal des commandes reçues : `agent.log` (qui, quelle machine, quelle action).
 
+## Sur une Raspberry Pi (démarrage automatique)
+
+L'agent n'a **pas** de session de 12 h à renouveler : il prouve son identité à chaque connexion
+(certificat + clé de signature) et se reconnecte tout seul. Il suffit qu'il démarre avec la Raspberry.
+
+1. Sur ton PC (Git Bash), depuis la racine du projet : `bash agent/exporter-raspberry.sh`
+   → `agent-raspberry.tar.gz` (environ 50 Ko : agent, config, clés, protocole, code de la librairie).
+2. Copie-la : `scp agent-raspberry.tar.gz pi@raspberrypi.local:~`, puis **supprime-la du PC** (elle contient les clés).
+3. Sur la Raspberry, une seule fois :
+   ```bash
+   mkdir -p ~/imprimantes && tar xzf ~/agent-raspberry.tar.gz -C ~/imprimantes && rm ~/agent-raspberry.tar.gz
+   bash ~/imprimantes/agent/installer-raspberry.sh
+   ```
+   Le script installe Python et ffmpeg, crée l'environnement, protège les clés, attend l'heure exacte au démarrage
+   et installe le service `imprimantes-agent` : il démarre à chaque allumage et redémarre s'il s'arrête.
+4. **Arrête l'agent du PC** : le serveur n'en accepte qu'un.
+
+Ensuite : `journalctl -u imprimantes-agent -f` (journal), `sudo systemctl restart imprimantes-agent` (redémarrer).
+Ne lance pas `python agent.py` à la main tant que le service tourne : ce serait un 2e agent, refusé.
+
+Les gcodes de l'imprimante sont re-téléchargés tout seuls au premier démarrage ; les vidéos sont enregistrées
+sur la carte SD (`client_printer/image/videos`). Si `web_printer` tourne encore sur le PC, chaque print serait
+filmé deux fois : coupe `enregistrement_auto` d'un côté.
+
 ## Ce que l'agent refuse, même si le serveur était piraté
 
 - toute commande absente de `../protocole/commandes.json`, tout champ inconnu, toute valeur hors bornes ;

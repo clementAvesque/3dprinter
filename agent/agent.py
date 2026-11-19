@@ -371,7 +371,20 @@ async def principal(config):
             code = e.rcvd.code if e.rcvd else None
             log.warning("connexion fermée (%s %s)", code, e.rcvd.reason if e.rcvd else "")
             attente = 60 if code in (4001, 4003, 4009) else attente
-        except (OSError, ssl.SSLError, websockets.InvalidStatus, asyncio.TimeoutError) as e:
+        except websockets.InvalidStatus as e:
+            code = e.response.status_code
+            raisons = {409: "place prise par une autre connexion d'agent ; le serveur vérifie si elle répond encore "
+                            "(sinon il la coupe sous 5 s). Si un autre agent tourne vraiment, arrête-le",
+                       403: "refusé par le serveur (certificat ou adresse IP non autorisés)",
+                       429: "adresse IP bannie par le serveur après trop d'échecs (redémarre le serveur ou attends 1 h)"}
+            log.warning("connexion refusée (HTTP %s) : %s", code, raisons.get(code, "voir le journal du serveur"))
+            if code == 409:
+                attente = 3          # la place se libère vite si l'ancienne connexion est morte : on revient tôt
+        except (ConnectionAbortedError, ConnectionResetError) as e:
+            # WinError 10053 / 10054 : le serveur a coupé la connexion dès l'ouverture
+            log.warning("connexion coupée par le serveur dès l'ouverture (%s) : un autre agent est peut-être "
+                        "déjà connecté, ou l'adresse IP est bannie ; voir le journal du serveur", e.__class__.__name__)
+        except (OSError, ssl.SSLError, asyncio.TimeoutError) as e:
             log.warning("serveur injoignable : %s", e)
         log.info("nouvel essai dans %d s", attente)
         await asyncio.sleep(attente)

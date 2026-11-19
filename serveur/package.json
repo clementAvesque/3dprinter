@@ -12,6 +12,7 @@
     "pki": "node scripts/pki.js",
     "agent:enroler": "node --disable-warning=ExperimentalWarning scripts/enroler-agent.js",
     "admin:creer": "node --disable-warning=ExperimentalWarning scripts/creer-admin.js",
+    "fly:secrets": "node --disable-warning=ExperimentalWarning scripts/fly-secrets.js",
     "test": "node --disable-warning=ExperimentalWarning --test --test-concurrency=1 --test-timeout=60000 test/serveur.test.js"
   },
   "dependencies": {

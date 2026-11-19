@@ -38,7 +38,53 @@ npm test       # 26 tests : fonctions + attaques (faux agent, aucune imprimante 
 Routes : voir le cahier des charges. Les lectures (`GET`) renvoient directement les données ; les commandes renvoient
 `{"ok": true, "resultat"}`, ou `202 {"operation"}` pour les longues (suivre `GET /operations/{id}` ou `/events`).
 
-## Mise en ligne
+## Mise en ligne sur Fly.io
+
+Tout est déjà configuré : `fly.toml`, `Dockerfile` et `.dockerignore` à la racine du projet, `serveur/docker-entrypoint.sh`.
+Les commandes `fly` se lancent depuis la **racine du projet** (là où est `fly.toml`).
+
+**Une seule fois :**
+
+1. Installe `flyctl` ([fly.io/docs/flyctl/install](https://fly.io/docs/flyctl/install/)), puis `fly auth login`.
+2. Dans `fly.toml`, remplace `app = "imprimantes-serveur"` par un nom libre (il donne `<nom>.fly.dev`).
+3. Crée l'app, son disque et son adresse IPv4 dédiée (nécessaire pour le port 8443 de l'agent, payante) :
+   ```bash
+   fly apps create <nom>
+   fly volumes create donnees --region cdg --size 1 --app <nom>
+   fly ips allocate-v4 --app <nom>
+   ```
+4. Envoie les secrets (dans `serveur/`) :
+   ```bash
+   npm run fly:secrets
+   ```
+   Le script refait les certificats pour `<nom>.fly.dev` si besoin, pointe `agent/config.json` vers
+   `wss://<nom>.fly.dev:8443/ws` et envoie à Fly les certificats du serveur et la clé publique de l'agent.
+   La clé de l'autorité (`pki/ca.key.pem`) ne quitte jamais ton PC.
+
+**Déployer (et à chaque mise à jour) :**
+
+```bash
+fly deploy
+fly scale count 1
+```
+
+Une seule machine : l'état des imprimantes est en mémoire et un seul agent se connecte.
+
+**Premier compte admin**, sur la machine Fly (le script d'entrée le lance avec l'utilisateur `node`) :
+
+```bash
+fly ssh console -C "env DONNEES=/data /usr/local/bin/docker-entrypoint.sh node /app/serveur/scripts/creer-admin.js ton@email.fr Ton Nom"
+```
+
+**Puis sur ton PC**, relance l'agent : il se connecte au serveur en ligne. Pour revenir au serveur local, remets
+l'adresse gardée dans `"serveur_local"` dans `agent/config.json`.
+
+À vérifier ensuite :
+- `https://<nom>.fly.dev/sante` répond `{"ok":true}` ; l'API est sur `https://<nom>.fly.dev/api/v1` ;
+- `fly logs` montre « WebSocket agent … derrière un proxy TCP avec PROXY protocol » puis la connexion de l'agent ;
+- si l'IP de ta box est fixe : `fly secrets set AGENT_IPS_AUTORISEES=x.x.x.x`.
+
+## Mise en ligne sur un serveur à toi (VPS)
 
 1. Un serveur avec ton nom de domaine. Certificats agent pour ce nom :
    `npm run pki -- --domaine agent.ton-domaine.fr --force` (puis recopier `agent/secrets/` sur le PC de l'agent).

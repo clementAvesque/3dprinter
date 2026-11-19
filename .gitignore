@@ -1,1 +1,6 @@
 .venv/
+# archive de l'agent pour la Raspberry : contient ses clés
+agent-raspberry.tar.gz
+.claude/
+Dockerfile
+fly.toml

@@ -20,10 +20,25 @@ function creerApi({ config, db, hub, journal }) {
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', config.api.trustProxy);
+  // vraie IP du visiteur fournie par l'hébergeur : sert aux limites de débit et au journal d'audit.
+  // Sans elle, derrière Fly, tout le monde aurait la même IP (celle du proxy) et partagerait les limites.
+  if (config.api.enteteIpClient) {
+    app.use((req, res, next) => {
+      const ip = String(req.headers[config.api.enteteIpClient] || '').trim();
+      if (/^[0-9a-fA-F.:]{3,45}$/.test(ip)) Object.defineProperty(req, 'ip', { value: ip, configurable: true });
+      next();
+    });
+  }
   app.use(helmet({
     contentSecurityPolicy: {
       useDefaults: true,
-      directives: { 'img-src': ["'self'", 'data:', 'blob:'], 'frame-ancestors': ["'none'"], 'connect-src': ["'self'"] },
+      // le site (dossier site/) ne charge que ses propres fichiers : aucun script ni style venu d'ailleurs
+      directives: {
+        'img-src': ["'self'", 'data:', 'blob:'], 'frame-ancestors': ["'none'"], 'connect-src': ["'self'"],
+        'script-src': ["'self'"], 'style-src': ["'self'"], 'font-src': ["'self'"], 'form-action': ["'self'"],
+        // en local (http://localhost) : ne pas forcer https sur les fichiers du site
+        ...(config.api.cookieSecure ? {} : { 'upgrade-insecure-requests': null }),
+      },
     },
     referrerPolicy: { policy: 'no-referrer' },
     strictTransportSecurity: { maxAge: 31536000, includeSubDomains: true },
@@ -45,6 +60,8 @@ function creerApi({ config, db, hub, journal }) {
 
   const auth = creerAuth({ db, config, journal });
   const { exige, confirme } = auth;
+  // vérification de santé de l'hébergeur : ne révèle rien (ni état de l'agent, ni version)
+  app.get('/sante', (req, res) => res.json({ ok: true }));
   const api = express.Router();
   api.use(express.json({ limit: '64kb', strict: true }));
   api.use(auth.charger);

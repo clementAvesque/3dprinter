@@ -7,7 +7,9 @@ const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
+const net = require('node:net');
 const os = require('node:os');
+const tls = require('node:tls');
 const path = require('node:path');
 const WebSocket = require('ws');
 const { genererPki, certificatClient } = require('../scripts/pki');
@@ -35,6 +37,12 @@ class FauxAgent {
     const o = this.opts;
     this.ws = new WebSocket(o.url || urlWs, {
       ca: pki.caPem, servername: 'localhost', perMessageDeflate: false,
+      // derrière un proxy : en-tête PROXY protocol envoyé en clair avant la poignée TLS
+      ...(o.entete ? { createConnection: (opts) => {
+        const brut = net.connect(o.relais, '127.0.0.1');
+        if (o.entete !== 'aucun') brut.write(o.entete);
+        return tls.connect({ ...opts, socket: brut });
+      } } : {}),
       ...(o.sansCertificat ? {} : {
         cert: o.cert ?? fs.readFileSync(path.join(dir, 'agent', 'agent.crt.pem')),
         key: o.key ?? fs.readFileSync(path.join(dir, 'agent', 'agent.key.pem')),
@@ -163,7 +171,7 @@ before(async () => {
     cle: path.join(dir, 'pki', 'serveur.key.pem') }, dossierAgent: path.join(dir, 'agent'), agentId: AGENT_ID, bits: 2048 });
   const fichierConfig = path.join(dir, 'config.json');
   fs.writeFileSync(fichierConfig, JSON.stringify({
-    api: { port: 0, cookieSecure: false },
+    api: { port: 0, cookieSecure: false, enteteIpClient: 'fly-client-ip' },
     agent: { port: 0, hote: '127.0.0.1', id: AGENT_ID, bannissement: { echecs: 1000, dureeMs: 3600e3 } },
     pki: { ca: path.join(dir, 'pki', 'ca.crt.pem'), cert: path.join(dir, 'pki', 'serveur.crt.pem'), cle: path.join(dir, 'pki', 'serveur.key.pem') },
     donnees: path.join(dir, 'data'),
@@ -255,6 +263,21 @@ test('connexion : 5 échecs puis blocage (429)', async () => {
   const c = new Client();
   for (let i = 0; i < 5; i++) await c.req('POST', '/auth/login', { email: 'cible@test.local', motdepasse: 'mauvais-mot-de-passe' });
   assert.equal((await c.req('POST', '/auth/login', { email: 'cible@test.local', motdepasse: 'mauvais-mot-de-passe' })).statut, 429);
+});
+
+test('derrière Fly : vraie IP du visiteur (Fly-Client-IP) ; un inconnu ne bloque pas ta connexion', async () => {
+  const c = new Client();
+  const essai = (ip) => c.req('POST', '/auth/login', { email: 'admin@test.local', motdepasse: 'mauvais-mot-de-passe' }, { 'fly-client-ip': ip });
+  for (let i = 0; i < 5; i++) await essai('198.51.100.20');          // un attaquant épuise SES essais
+  assert.equal((await essai('198.51.100.20')).statut, 429);
+  assert.equal((await essai('203.0.113.50')).statut, 401, 'une autre IP n\'est pas bloquée');
+  const ips = srv.db.prepare("SELECT DISTINCT ip FROM audit WHERE action = 'auth.login'").all().map((r) => r.ip);
+  assert.ok(ips.includes('198.51.100.20') && ips.includes('203.0.113.50'), JSON.stringify(ips));
+  // le vrai admin, depuis chez lui, passe toujours l'étape du mot de passe
+  const bonne = await new Client().req('POST', '/auth/login', { email: 'admin@test.local', motdepasse: 'mot-de-passe-de-test!' },
+    { 'fly-client-ip': '192.0.2.10' });
+  assert.equal(bonne.statut, 200);
+  assert.equal(bonne.json.etape, '2fa');
 });
 
 // ------------------------------------------------------------------ API : machines et commandes
@@ -423,8 +446,71 @@ test('agent révoqué : refusé', async () => {
 test('bannissement : 5 échecs depuis une IP -> coupée dès la connexion', async () => {
   srv.hub.echecs.clear();
   srv.hub.config.agent.bannissement.echecs = 5;
+  srv.hub.config.agent.bannissement.exempterLocal = false;   // les tests viennent de 127.0.0.1
   for (let i = 0; i < 5; i++) await new FauxAgent({ signatureFausse: true }).connecter().catch(() => {});
   await assert.rejects(new FauxAgent().connecter());
   const j = srv.db.prepare("SELECT COUNT(*) n FROM audit WHERE action = 'agent.echec'").get();
   assert.ok(j.n >= 5);
+});
+
+test('derrière un proxy (Fly.io) : vraie IP lue dans le PROXY protocol, bannissement par vraie IP', async () => {
+  const cfg = path.join(dir, 'config-proxy.json');
+  fs.writeFileSync(cfg, JSON.stringify({
+    api: { port: 0, cookieSecure: false },
+    agent: { port: 0, hote: '127.0.0.1', id: AGENT_ID, proxyProtocol: true, bannissement: { echecs: 2, dureeMs: 3600e3 } },
+    pki: { ca: path.join(dir, 'pki', 'ca.crt.pem'), cert: path.join(dir, 'pki', 'serveur.crt.pem'), cle: path.join(dir, 'pki', 'serveur.key.pem') },
+    donnees: path.join(dir, 'data-proxy'),
+  }));
+  const s2 = await demarrer(charger(cfg, {}));
+  try {
+    s2.db.prepare('INSERT INTO agent (id, cle_publique, revoque, enrole) VALUES (?, ?, 0, ?)')
+      .run(AGENT_ID, cleAgent.publicKey.export({ type: 'spki', format: 'pem' }), Date.now());
+    const relais = s2.hub.relais.address().port;
+    const url = `wss://localhost:${relais}/ws`;
+    const entete = (ip) => `PROXY TCP4 ${ip} 10.0.0.1 40000 8443\r\n`;
+
+    // sans en-tête : la connexion ne vient pas du proxy, refusée avant toute poignée TLS
+    await assert.rejects(new FauxAgent({ url, relais, entete: 'aucun' }).connecter());
+    // un attaquant (198.51.100.7) se fait bannir...
+    for (let i = 0; i < 2; i++) await new FauxAgent({ url, relais, entete: entete('198.51.100.7'), signatureFausse: true }).connecter().catch(() => {});
+    await assert.rejects(new FauxAgent({ url, relais, entete: entete('198.51.100.7') }).connecter());
+    // ...sans bannir l'agent légitime, qui passe pourtant par le même proxy
+    const a = new FauxAgent({ url, relais, entete: entete('203.0.113.9') });
+    await a.connecter();
+    assert.equal(s2.hub.statut().ip, '203.0.113.9');
+    const echecs = s2.db.prepare("SELECT ip FROM audit WHERE action = 'agent.echec'").all().map((r) => r.ip);
+    assert.ok(echecs.includes('198.51.100.7') && !echecs.includes('127.0.0.1'), JSON.stringify(echecs));
+    a.fermer();
+  } finally {
+    await s2.arreter();
+  }
+});
+
+test('connexion fantôme : coupée sous 5 s si un nouvel agent attend ; les refus 409 ne bannissent pas', async () => {
+  srv.hub.echecs.clear();
+  srv.hub.config.agent.bannissement.exempterLocal = false;
+  srv.hub.config.agent.bannissement.echecs = 2;
+  const fantome = new FauxAgent();
+  await fantome.connecter();
+  fantome.ws._socket.pause();                       // ne lit plus rien : ne répond plus aux pings
+  for (let i = 0; i < 4; i++) {                     // 4 refus 409 : plus que le seuil de bannissement
+    await assert.rejects(new FauxAgent().connecter(), (e) => e.statut === 409);
+  }
+  await attendre(() => srv.hub.lien === null, 8000);
+  const nouveau = new FauxAgent();
+  await nouveau.connecter();                       // pas banni, et la place est libre
+  assert.equal(srv.hub.statut().connecte, true);
+  nouveau.fermer();
+  fantome.fermer();
+  await attendre(() => srv.hub.lien === null);
+  srv.hub.config.agent.bannissement.exempterLocal = true;
+});
+
+test('le PC lui-même (127.0.0.1) n\'est jamais banni par défaut', async () => {
+  srv.hub.config.agent.bannissement.exempterLocal = true;
+  const a = new FauxAgent();
+  await a.connecter();                  // malgré les 5 échecs du test précédent
+  assert.equal(srv.hub.statut().connecte, true);
+  a.fermer();
+  await attendre(() => srv.hub.lien === null);
 });

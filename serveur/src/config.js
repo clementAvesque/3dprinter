@@ -14,13 +14,20 @@ const DEFAUT = {
     trustProxy: 'loopback',   // adresse réelle du visiteur lue dans X-Forwarded-For de Caddy seulement
     cookieSecure: true,       // cookie __Host- (HTTPS ; les navigateurs l'acceptent aussi sur http://localhost)
     origineSite: null,        // ex. "https://imprimantes.mon-domaine.fr" si le site est sur un autre domaine
+    // en-tête où l'hébergeur écrit la vraie IP du visiteur (Fly.io : "fly-client-ip", qu'il écrase
+    // lui-même : un visiteur ne peut pas le falsifier). null = X-Forwarded-For selon trustProxy.
+    enteteIpClient: null,
   },
   agent: {
     hote: '0.0.0.0',
     port: 8443,
     id: 'agent-maison',       // seul identifiant d'agent accepté (= CN de son certificat)
     ipsAutorisees: [],        // vide = toutes ; sinon ex. ["203.0.113.7"] (IP publique de ta box)
-    bannissement: { echecs: 5, dureeMs: 3600e3 },   // 5 échecs en 1 h -> IP coupée pendant 1 h
+    // 5 échecs en 1 h -> IP coupée pendant 1 h ; le PC lui-même (127.0.0.1) n'est jamais banni
+    bannissement: { echecs: 5, dureeMs: 3600e3, exempterLocal: true },
+    // derrière un proxy TCP (Fly.io) : il ajoute la vraie IP de l'agent en tête de connexion
+    // (PROXY protocol v1). Sans ça, toutes les connexions viendraient de l'IP du proxy.
+    proxyProtocol: false,
   },
   pki: {
     ca: 'pki/ca.crt.pem',
@@ -46,10 +53,36 @@ function fusion(base, ajout) {
   return r;
 }
 
-function charger(fichier = process.env.CONFIG || path.join(RACINE, 'config.json')) {
+// réglages par variables d'environnement (hébergeurs comme Fly.io : fly.toml [env] et fly secrets),
+// appliqués après config.json. Les secrets (certificats) ne sont jamais dans l'image Docker.
+function depuisEnv(c, env = process.env) {
+  const entier = (v) => (v === undefined ? undefined : Number(v));
+  const liste = (v) => (v === undefined ? undefined : v.split(',').map((x) => x.trim()).filter(Boolean));
+  const vrai = (v) => (v === undefined ? undefined : ['1', 'true', 'oui'].includes(v.toLowerCase()));
+  const poser = (objet, cle, valeur) => { if (valeur !== undefined && !Number.isNaN(valeur)) objet[cle] = valeur; };
+  poser(c.api, 'hote', env.API_HOTE);
+  poser(c.api, 'port', entier(env.API_PORT));
+  if (env.TRUST_PROXY !== undefined) c.api.trustProxy = /^\d+$/.test(env.TRUST_PROXY) ? Number(env.TRUST_PROXY) : env.TRUST_PROXY;
+  poser(c.api, 'origineSite', env.ORIGINE_SITE);
+  poser(c.api, 'enteteIpClient', env.ENTETE_IP_CLIENT?.toLowerCase());
+  poser(c.agent, 'hote', env.AGENT_HOTE);
+  poser(c.agent, 'port', entier(env.AGENT_PORT));
+  poser(c.agent, 'id', env.AGENT_ID);
+  poser(c.agent, 'ipsAutorisees', liste(env.AGENT_IPS_AUTORISEES));
+  poser(c.agent, 'proxyProtocol', vrai(env.AGENT_PROXY_PROTOCOL));
+  poser(c, 'donnees', env.DONNEES);
+  // certificats en base64 (fly secrets) : prioritaires sur les fichiers pki/
+  const pem = (v) => (v ? Buffer.from(v, 'base64') : null);
+  c.pkiPem = { ca: pem(env.PKI_CA_B64), cert: pem(env.PKI_CERT_B64), cle: pem(env.PKI_CLE_B64) };
+  // clé publique de l'agent à enrôler au démarrage (évite d'avoir à copier un fichier sur le serveur)
+  c.agentClePublique = env.AGENT_CLE_PUBLIQUE_B64 ? Buffer.from(env.AGENT_CLE_PUBLIQUE_B64, 'base64').toString('utf8') : null;
+  return c;
+}
+
+function charger(fichier = process.env.CONFIG || path.join(RACINE, 'config.json'), env = process.env) {
   let perso = {};
   if (fs.existsSync(fichier)) perso = JSON.parse(fs.readFileSync(fichier, 'utf8'));
-  const c = fusion(DEFAUT, perso);
+  const c = depuisEnv(fusion(DEFAUT, perso), env);
   const abs = (p) => (path.isAbsolute(p) ? p : path.join(RACINE, p));
   c.pki = { ca: abs(c.pki.ca), cert: abs(c.pki.cert), cle: abs(c.pki.cle) };
   c.donnees = abs(c.donnees);
@@ -57,4 +90,9 @@ function charger(fichier = process.env.CONFIG || path.join(RACINE, 'config.json'
   return c;
 }
 
-module.exports = { charger, RACINE };
+// contenu PEM : variable d'environnement si présente, sinon le fichier
+function lirePki(c, nom) {
+  return c.pkiPem?.[nom] || fs.readFileSync(c.pki[nom]);
+}
+
+module.exports = { charger, lirePki, RACINE };
