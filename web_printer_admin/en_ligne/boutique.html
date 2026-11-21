@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#1a1d23">
+  <title>Boutique · Imprimantes</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icones/icone.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icones/apple-touch-icon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="barre">
+  <div class="marque">
+    <span id="point" class="point"></span>
+    <div>
+      <h1>Imprimantes</h1>
+      <span id="agent-etat" class="muted small">connexion…</span>
+    </div>
+  </div>
+  <nav class="nav">
+    <a href="index.html">Imprimer</a>
+    <a href="suivi.html">Suivi 3D</a>
+    <a href="galerie.html">Galerie</a>
+    <a href="boutique.html" class="actif" aria-current="page">Boutique</a>
+  </nav>
+  <select id="machine" title="machine" hidden></select>
+  <span id="badge" class="badge">…</span>
+  <a id="utilisateur" class="small lien-profil" href="profil.html" title="Mon profil"></a>
+  <button id="deconnexion" class="fantome">Se déconnecter</button>
+</header>
+
+<main class="galerie">
+
+  <section class="resume">
+    <div class="tuile"><span class="muted small">À valider</span><b id="r-valider">—</b></div>
+    <div class="tuile"><span class="muted small">En retard sur l'objectif (2 sem.)</span><b id="r-retard">—</b></div>
+    <div class="tuile"><span class="muted small">Devis en attente de découpe</span><b id="r-devis">—</b></div>
+    <div class="tuile"><span class="muted small">Clients</span><b id="r-clients">—</b></div>
+  </section>
+  <p id="r-alertes" class="alerte small" hidden></p>
+
+  <div class="segments onglets-boutique" role="tablist">
+    <button role="tab" data-onglet="commandes" class="actif">Commandes</button>
+    <button role="tab" data-onglet="lots">Lots</button>
+    <button role="tab" data-onglet="factures">Factures</button>
+    <button role="tab" data-onglet="clients">Clients</button>
+  </div>
+
+  <section id="o-commandes" class="card">
+    <div class="barre-outils">
+      <select id="filtre-statut">
+        <option value="payee">À valider (payées)</option>
+        <option value="validee,dans_un_lot,en_impression,suspendue">En production</option>
+        <option value="imprimee">À expédier</option>
+        <option value="expediee,livree">Expédiées</option>
+        <option value="remboursee">Remboursées</option>
+        <option value="">Toutes</option>
+      </select>
+      <span class="grow"></span>
+      <button id="rafraichir" class="fantome">Rafraîchir</button>
+    </div>
+    <div class="tableau">
+      <table>
+        <thead><tr><th>N°</th><th>Client</th><th>Pièces</th><th>Total</th><th>Statut</th><th>Échéance</th></tr></thead>
+        <tbody id="t-commandes"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="o-lots" class="card" hidden>
+    <p class="muted small">Regroupement des commandes sur un plateau : arrive avec la découpe Orca (étape 6).</p>
+    <div class="tableau">
+      <table>
+        <thead><tr><th>Lot</th><th>Imprimante</th><th>Propreté</th><th>Pièces</th><th>Commandes</th><th>Statut</th><th>Créé</th></tr></thead>
+        <tbody id="t-lots"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="o-factures" class="card" hidden>
+    <div class="tableau">
+      <table>
+        <thead><tr><th>Numéro</th><th>Commande</th><th>Client</th><th>Total</th><th>Émise</th></tr></thead>
+        <tbody id="t-factures"></tbody>
+      </table>
+    </div>
+  </section>
+
+
+  <section id="o-clients" class="card" hidden>
+    <div class="tableau">
+      <table>
+        <thead><tr><th>Client</th><th>E-mail</th><th>Vérifié</th><th>Commandes</th><th>Inscrit le</th></tr></thead>
+        <tbody id="t-clients"></tbody>
+      </table>
+    </div>
+  </section>
+
+</main>
+
+<!-- fiche d'une commande -->
+<dialog id="fiche" class="fiche">
+  <div class="fiche-tete">
+    <h2 id="c-titre" class="titre-fichier"></h2>
+    <button id="c-fermer" class="fantome" aria-label="Fermer">✕</button>
+  </div>
+  <div class="fiche-corps">
+    <div class="vue3d" id="c-vue">
+      <div id="c-message" class="vue-message muted">Aperçu du gcode…</div>
+    </div>
+    <div class="fiche-infos">
+      <div class="stats">
+        <div>Statut<b id="c-statut">—</b></div>
+        <div>Total<b id="c-total">—</b></div>
+        <div>Payée le<b id="c-paye">—</b></div>
+        <div>Échéance<b id="c-echeance">—</b></div>
+      </div>
+      <p id="c-client" class="small"></p>
+      <p id="c-adresse" class="small muted"></p>
+      <p id="c-reglages" class="small muted"></p>
+      <ul id="c-pieces" class="liste-pieces"></ul>
+      <p class="small"><span id="c-decoupe" class="muted"></span>
+        <a id="c-gcode" class="lien" hidden>Télécharger le gcode (découpé par le serveur)</a></p>
+      <p id="c-motif" class="alerte small" hidden></p>
+      <div id="c-actions" class="row"></div>
+    </div>
+  </div>
+</dialog>
+
+<!-- motif de refus -->
+<dialog id="refus">
+  <form id="refus-form" method="dialog">
+    <h2>Refuser et rembourser</h2>
+    <p class="muted small">Le client est remboursé intégralement et prévenu par e-mail (sans le motif, qui reste pour toi).</p>
+    <select id="refus-motif">
+      <option>Pièce dangereuse (arme, pièce de sécurité)</option>
+      <option>Contenu à caractère sexuel</option>
+      <option>Pièce non imprimable</option>
+      <option>Autre</option>
+    </select>
+    <input id="refus-detail" maxlength="300" placeholder="Précision (facultatif)">
+    <div class="row fin">
+      <button type="button" class="fantome" id="refus-annuler">Annuler</button>
+      <button class="danger plein" value="ok">Refuser et rembourser</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- expédition -->
+<dialog id="expedition">
+  <form id="expedition-form" method="dialog">
+    <h2>Commande expédiée</h2>
+    <input id="expedition-suivi" maxlength="40" required placeholder="Numéro de suivi">
+    <div class="row fin">
+      <button type="button" class="fantome" id="expedition-annuler">Annuler</button>
+      <button class="primaire" value="ok">Enregistrer</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- code 2FA redemandé pour les actions sensibles (commun.js) -->
+<dialog id="confirmation">
+  <form id="conf-form" method="dialog">
+    <h2>Confirme avec ton code</h2>
+    <p class="muted small">Action sensible : saisis le code à 6 chiffres de ton application.</p>
+    <input id="conf-code" class="code" inputmode="numeric" autocomplete="one-time-code" maxlength="20" required>
+    <p id="conf-erreur" class="message erreur" hidden></p>
+    <div class="row">
+      <button type="button" class="fantome grow" id="conf-annuler">Annuler</button>
+      <button class="primaire grow" value="ok">Confirmer</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="toasts" class="toasts"></div>
+<script src="config.js"></script>
+<script src="commun.js"></script>
+<script src="machine.js"></script>
+<script type="module" src="boutique.js"></script>
+</body>
+</html>

@@ -1,8 +1,10 @@
 'use strict';
-// Base SQLite (intégrée à Node 22, aucune dépendance native) : comptes, sessions, journal d'audit, agent.
+// Base SQLite (intégrée à Node 22, aucune dépendance native) : comptes, sessions, journal d'audit, agent,
+// et les tables de la boutique (db-boutique.js).
 
 const path = require('node:path');
 const { DatabaseSync } = require('node:sqlite');
+const { schemaBoutique } = require('./db-boutique');
 
 function ouvrir(dossier) {
   const db = new DatabaseSync(path.join(dossier, 'serveur.db'));
@@ -55,6 +57,7 @@ function ouvrir(dossier) {
       enrole        INTEGER NOT NULL
     );
   `);
+  schemaBoutique(db);
   return db;
 }
 

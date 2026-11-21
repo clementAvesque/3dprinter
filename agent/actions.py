@@ -155,6 +155,10 @@ class Machine:
                 return _res(pic)
             return {"ok": True, "resultat": None, "octets": pic, "mime": "image/jpeg"}
         if action == "camera.stream":
+            if p["actif"] and not self.flux_video:
+                # réglage perdu à chaque redémarrage de l'imprimante : sans lui la caméra tombe à 0,2 image/s
+                # (chaque photo attend alors ~5 s et l'imprimante sature). En arrière-plan : réponse immédiate.
+                threading.Thread(target=pr.camera.fast_mode, daemon=True).start()
             self.flux_video = p["actif"]
             return {"ok": True, "resultat": {"actif": self.flux_video}}
         if action == "record.start":

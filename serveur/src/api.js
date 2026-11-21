@@ -13,10 +13,14 @@ const S = require('./securite');
 const { COMMANDES, valider, definition, verifierValeur, TYPES } = require('./protocole');
 const { creerAuth, EMAIL_RE, asynchrone } = require('./auth');
 const { ErreurHub } = require('./hub');
+const { creerClients } = require('./clients');
+const { creerBoutique } = require('./boutique');
+const { creerCourriel } = require('./courriel');
+const { creerPaiements } = require('./paiements');
 
 const ROLES = ['lecteur', 'operateur', 'admin'];
 
-function creerApi({ config, db, hub, journal }) {
+function creerApi({ config, db, hub, journal, courriel = creerCourriel(config), paiements = creerPaiements(config) }) {
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', config.api.trustProxy);
@@ -60,6 +64,10 @@ function creerApi({ config, db, hub, journal }) {
 
   const auth = creerAuth({ db, config, journal });
   const { exige, confirme } = auth;
+  const clients = creerClients({ db, config, journal, courriel });
+  const boutique = creerBoutique({ config, db, journal, courriel, paiements, clients, exige, confirme });
+  app.locals.boutique = boutique;
+  app.locals.courriel = courriel;
   // vérification de santé de l'hébergeur : ne révèle rien (ni état de l'agent, ni version)
   app.get('/sante', (req, res) => res.json({ ok: true }));
   const api = express.Router();
@@ -502,6 +510,10 @@ function creerApi({ config, db, hub, journal }) {
     res.json({ ok: true });
   });
 
+  // ------------------------------------------------------------ boutique (admin)
+
+  api.use('/boutique', boutique.routesAdmin);
+
   // ------------------------------------------------------------ fin
 
   api.use((req, res) => res.status(404).json({ erreur: 'route_inconnue' }));
@@ -514,6 +526,58 @@ function creerApi({ config, db, hub, journal }) {
   });
 
   app.use('/api/v1', api);
+
+  // ------------------------------------------------------------ API du site client (/api/client)
+  // comptes clients séparés des comptes admin : autre cookie, autres sessions, aucune route admin ici
+
+  const cl = express.Router();
+  cl.use(express.json({ limit: '64kb', strict: true }));
+  cl.use(clients.charger);
+  cl.use(clients.csrf);
+  cl.use(rateLimit({
+    windowMs: 60e3, limit: 120, standardHeaders: 'draft-7', legacyHeaders: false,
+    keyGenerator: (req) => (req.client ? `c${req.client.id}` : req.ip),
+    message: { erreur: 'trop_de_requetes', detail: '120 requêtes par minute maximum' },
+  }));
+  cl.use(clients.routes);
+  cl.use(boutique.routesClient);
+  cl.use((req, res) => res.status(404).json({ erreur: 'route_inconnue' }));
+  // eslint-disable-next-line no-unused-vars
+  cl.use((err, req, res, next) => {
+    if (err.type === 'entity.parse.failed') return res.status(400).json({ erreur: 'json_invalide' });
+    if (err.type === 'entity.too.large') return res.status(413).json({ erreur: 'requete_trop_grosse' });
+    if (err.code === 'COURRIEL') {
+      // service d'e-mails en panne ou mal réglé (clé, expéditeur) : le détail reste dans les logs
+      console.error(`[courriel] ${err.message}`);
+      return res.headersSent ? undefined : res.status(503).json({ erreur: 'courriel_indisponible' });
+    }
+    console.error(err);
+    if (!res.headersSent) res.status(500).json({ erreur: 'erreur_interne' });
+  });
+  app.use('/api/client', cl);
+
+  // tâches de la boutique toutes les heures (purges, rappels, remboursements automatiques)
+  const tache = () => boutique.tacheHoraire().catch((e) => console.error('tâche boutique :', e));
+  setTimeout(tache, 60e3).unref();
+  setInterval(tache, 3600e3).unref();
+
+  // ------------------------------------------------------------ site client (web_printer_user/front/dist)
+  // servi à la même adresse que l'API : les liens des e-mails (/verifier, /reinitialiser) y mènent
+
+  const site = config.siteClient;
+  if (site && fs.existsSync(path.join(site, 'index.html'))) {
+    // fichiers de build au nom unique (hash) : gardés en cache un an ; le reste revalidé à chaque fois
+    app.use('/assets', express.static(path.join(site, 'assets'), { immutable: true, maxAge: '365d' }));
+    app.use(express.static(site, { index: false, maxAge: 0 }));
+    // pages de l'application (/verifier, /compte, /devis/12...) : index.html, le routeur Vue fait le reste.
+    // Pas pour l'API, ni pour un fichier absent (extension) : ceux-là restent des 404.
+    app.get(/^(?!\/api\/|\/sante$)[^.]*$/, (req, res) => {
+      res.set('Cache-Control', 'no-cache').sendFile(path.join(site, 'index.html'));
+    });
+  } else if (site) {
+    console.warn(`site client absent (${site}) : seule l'API est servie`);
+  }
+
   app.use((req, res) => res.status(404).json({ erreur: 'route_inconnue' }));
   return app;
 }

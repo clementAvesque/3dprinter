@@ -81,8 +81,48 @@ l'adresse gardée dans `"serveur_local"` dans `agent/config.json`.
 
 À vérifier ensuite :
 - `https://<nom>.fly.dev/sante` répond `{"ok":true}` ; l'API est sur `https://<nom>.fly.dev/api/v1` ;
+- le site client (`web_printer_user/front`) est compilé dans l'image et servi à la racine `https://<nom>.fly.dev/`
+  (c'est là que mènent les liens des e-mails) : un `fly deploy` suffit pour publier une modification du site ;
 - `fly logs` montre « WebSocket agent … derrière un proxy TCP avec PROXY protocol » puis la connexion de l'agent ;
 - si l'IP de ta box est fixe : `fly secrets set AGENT_IPS_AUTORISEES=x.x.x.x`.
+
+### Découpe des devis (OrcaSlicer)
+
+Le serveur découpe lui-même chaque devis avec OrcaSlicer (installé dans l'image Docker, version épinglée et
+vérifiée dans le `Dockerfile`), un devis à la fois (`src/orca.js`) : poids, durée, prix, et un aperçu 3D couche
+par couche sur la page du devis. Le client ne voit que l'aperçu ; **l'admin reçoit le gcode** (aperçu +
+téléchargement dans la fiche d'une commande payée) et n'a plus accès aux STL des clients.
+
+- Profils : `orca/kobra3/` (machine, découpe, filament), tirés des profils Kobra 3 d'Anycubic Slicer Next par
+  `python scripts/orca_profils.py` (à relancer après une mise à jour du slicer, puis `fly deploy`).
+- « Rapide » découpe en 0,28 mm : la Kobra 3 avec une buse de 0,4 mm n'accepte pas plus.
+- Chaque construction de l'image lance `scripts/essai-orca.js` (deux cubes, fine et rapide, avec le vrai Orca) :
+  si la découpe échoue, l'image n'est pas construite et le serveur en ligne ne change pas.
+- Orca a besoin de mémoire : machine Fly de 1 Go au moins (`fly scale memory 1024`).
+- En local, sans Orca : les devis restent « en file ». `ORCA_CMD` indique la commande à lancer.
+
+### E-mails des clients (Brevo)
+
+Sans réglage, les e-mails (confirmation d'inscription, mot de passe oublié, suivi des commandes) sont seulement
+écrits dans `fly logs` : les clients ne reçoivent rien. Pour de vrais envois, avec [Brevo](https://www.brevo.com)
+(gratuit jusqu'à 300 e-mails/jour, pas besoin de nom de domaine) :
+
+1. Crée un compte Brevo, puis **Senders, Domains & Dedicated IPs > Senders > Add a sender** : ajoute l'adresse
+   qui enverra les e-mails (ta Gmail par ex.) et valide-la avec le lien que Brevo t'envoie.
+2. **SMTP & API > API Keys > Generate a new API key** : copie la clé (`xkeysib-…`).
+3. Depuis la racine du projet : `python serveur/scripts/brevo_template.py`. Le script demande la clé (masquée)
+   et l'adresse expéditeur, crée la mise en page HTML chez Brevo (ou la met à jour), t'envoie un e-mail d'essai,
+   puis envoie à Fly la clé, l'expéditeur et le numéro du template (le serveur redémarre tout seul).
+   La mise en page est dans `scripts/brevo-template.html` : après une retouche, relance le script.
+4. `URL_SITE` doit être l'adresse publique du site client : c'est elle qui est mise dans les liens des e-mails
+   (par défaut `https://<nom>.fly.dev`, voir `src/config.js`).
+
+Si la clé ou l'expéditeur manque, le serveur refuse de démarrer (message dans `fly logs`). Si Brevo refuse un envoi
+(clé révoquée, expéditeur non validé), l'inscription répond « Impossible d'envoyer l'e-mail » et la raison exacte
+est écrite dans `fly logs` (`[courriel] …`). Pour essayer en local : mêmes variables en `$env:...` dans le terminal
+avant de lancer le serveur. **Pas dans `dev.env`** : ce fichier est suivi par git, la clé finirait dans un commit.
+Brevo ajoute un petit pied de page à ses e-mails gratuits, et ils peuvent arriver dans les indésirables tant que
+l'expéditeur est une Gmail (un nom de domaine à toi, authentifié chez Brevo, règle ça).
 
 ## Mise en ligne sur un serveur à toi (VPS)
 

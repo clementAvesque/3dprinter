@@ -4,3 +4,6 @@ agent-raspberry.tar.gz
 .claude/
 Dockerfile
 fly.toml
+# cookies de session (curl) et caches Python : jamais dans git
+cookies.txt
+__pycache__/

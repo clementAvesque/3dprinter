@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Galerie · Imprimantes</title>
+  <meta name="theme-color" content="#1a1d23">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icones/icone.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icones/apple-touch-icon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="barre">
+  <div class="marque">
+    <span id="point" class="point"></span>
+    <div>
+      <h1>Imprimantes</h1>
+      <span id="agent-etat" class="muted small">connexion…</span>
+    </div>
+  </div>
+  <nav class="nav">
+    <a href="index.html">Imprimer</a>
+    <a href="suivi.html">Suivi 3D</a>
+    <a href="galerie.html" class="actif" aria-current="page">Galerie</a>
+    <a href="boutique.html">Boutique</a>
+  </nav>
+  <select id="machine" title="machine" hidden></select>
+  <span id="badge" class="badge">…</span>
+  <a id="utilisateur" class="small lien-profil" href="profil.html" title="Mon profil"></a>
+  <button id="deconnexion" class="fantome">Se déconnecter</button>
+</header>
+
+<main class="galerie">
+
+  <section class="resume">
+    <div class="tuile"><span class="muted small">Pièces</span><b id="r-pieces">—</b></div>
+    <div class="tuile"><span class="muted small">Impressions terminées</span><b id="r-prints">—</b></div>
+    <div class="tuile"><span class="muted small">Filament utilisé</span><b id="r-filament">—</b></div>
+    <div class="tuile"><span class="muted small">Temps d'impression</span><b id="r-temps">—</b></div>
+  </section>
+
+  <div class="barre-outils">
+    <input id="recherche" type="search" class="grow" placeholder="Rechercher une pièce…" autocomplete="off">
+    <select id="tri">
+      <option value="nom">Nom</option>
+      <option value="imprimes">Plus imprimées</option>
+      <option value="recent">Imprimées récemment</option>
+      <option value="poids">Plus lourdes</option>
+      <option value="temps">Plus longues</option>
+    </select>
+    <button id="btn-selection" class="fantome">Sélectionner</button>
+  </div>
+
+  <div id="barre-selection" class="barre-selection" hidden>
+    <b id="sel-nb">0 sélectionnée</b>
+    <button id="sel-tout" class="fantome">Tout sélectionner</button>
+    <span class="grow"></span>
+    <button id="sel-annuler" class="fantome">Annuler</button>
+    <button id="sel-supprimer" class="danger" disabled>Supprimer</button>
+  </div>
+
+  <div id="cartes" class="cartes"><p class="muted">Chargement…</p></div>
+
+  <section class="card">
+    <h2>Historique des impressions</h2>
+    <div class="tableau">
+      <table>
+        <thead><tr><th>Pièce</th><th>Date</th><th>Durée</th><th>Filament</th><th>Statut</th></tr></thead>
+        <tbody id="historique"></tbody>
+      </table>
+    </div>
+  </section>
+
+</main>
+
+<!-- fiche d'une pièce -->
+<dialog id="fiche" class="fiche">
+  <div class="fiche-tete">
+    <h2 id="f-nom" class="titre-fichier"></h2>
+    <button id="f-fermer" class="fantome" aria-label="Fermer">✕</button>
+  </div>
+  <div class="fiche-corps">
+    <div class="vue3d" id="f-vue">
+      <div class="outils">
+        <button class="fantome" data-vue="iso">3D</button>
+        <button class="fantome" data-vue="dessus">Dessus</button>
+        <button class="fantome" data-vue="face">Face</button>
+      </div>
+      <div id="f-message" class="vue-message muted"></div>
+      <div class="curseur-couche">
+        <span class="muted small">Couche</span>
+        <input id="f-couche" type="range" min="0" max="0" value="0" disabled>
+        <b id="f-couche-txt" class="mono">—</b>
+      </div>
+    </div>
+    <div class="fiche-infos">
+      <div class="stats">
+        <div>Durée estimée<b id="f-temps">—</b></div>
+        <div>Filament<b id="f-poids">—</b></div>
+        <div>Fichier<b id="f-taille">—</b></div>
+        <div>Couches<b id="f-couches">—</b></div>
+        <div>Imprimée<b id="f-nb">—</b></div>
+        <div>Dernière fois<b id="f-derniere">—</b></div>
+      </div>
+      <div class="fil-bloc">
+        <span class="muted small">Fil prévu par le fichier</span>
+        <div id="f-fil" class="fil-liste"></div>
+      </div>
+      <p id="f-conseil" class="small conseil" hidden></p>
+      <div class="row">
+        <select id="f-slot" class="grow">
+          <option value="">Par défaut (emplacement 1)</option>
+          <option value="1">ACE emplacement 1</option>
+          <option value="2">ACE emplacement 2</option>
+          <option value="3">ACE emplacement 3</option>
+          <option value="4">ACE emplacement 4</option>
+        </select>
+        <button id="f-imprimer" class="primaire">Imprimer</button>
+      </div>
+      <a id="f-suivi" class="lien" href="suivi.html">Ouvrir dans Suivi 3D →</a>
+      <button id="f-supprimer" class="danger supprimer">Supprimer ce gcode</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- confirmation de suppression (une ou plusieurs pièces) -->
+<dialog id="suppression">
+  <form method="dialog">
+    <h2 id="c-titre">Supprimer ?</h2>
+    <ul id="c-liste" class="c-liste"></ul>
+    <p class="muted small">Le gcode est supprimé de l'imprimante, avec sa miniature et son aperçu 3D.
+      C'est définitif. L'historique des impressions, lui, est conservé.</p>
+    <div class="row fin">
+      <button value="non" class="fantome">Annuler</button>
+      <button value="oui" id="c-ok" class="danger plein">Supprimer</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- code 2FA redemandé pour les actions sensibles (commun.js) -->
+<dialog id="confirmation">
+  <form id="conf-form" method="dialog">
+    <h2>Confirme avec ton code</h2>
+    <p class="muted small">Action sensible : saisis le code à 6 chiffres de ton application.</p>
+    <input id="conf-code" class="code" inputmode="numeric" autocomplete="one-time-code" maxlength="20" required>
+    <p id="conf-erreur" class="message erreur" hidden></p>
+    <div class="row">
+      <button type="button" class="fantome grow" id="conf-annuler">Annuler</button>
+      <button class="primaire grow" value="ok">Confirmer</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="toasts" class="toasts"></div>
+<script src="config.js"></script>
+<script src="commun.js"></script>
+<script src="filament.js"></script>
+<script src="machine.js"></script>
+<script type="module" src="galerie.js"></script>
+</body>
+</html>

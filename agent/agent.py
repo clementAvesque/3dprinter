@@ -33,6 +33,7 @@ from protocole import COMMANDES, LIMITES, valider
 ICI = os.path.dirname(os.path.abspath(__file__))
 ID_RE_MAX = 40
 JSON_INLINE_MAX = 48_000           # au-delà, un résultat part en transfert (morceaux)
+VIDEO_TAMPON_MAX = 256 * 1024      # octets pas encore partis vers le serveur : au-delà, la vidéo saute des images
 log = logging.getLogger("agent")
 
 
@@ -302,7 +303,10 @@ class Session:
             await asyncio.sleep(2)
 
     async def pousser_video(self):
-        # 5 images/s au plus, et seulement pour les machines que quelqu'un regarde
+        # 1 image toutes les `video_intervalle_s` secondes (1 s par défaut), seulement pour les machines
+        # que quelqu'un regarde. Plus vite, la Kobra 3 sature : l'état ne répond plus ("Machine injoignable").
+        intervalle = min(10.0, max(0.5, float(self.config.get("video_intervalle_s", 1.0))))
+        erreurs = {}                     # dernière erreur caméra par machine : écrite une fois dans le journal
         while True:
             actives = [m for m in self.machines.values() if m.flux_video]
             if not actives:
@@ -310,10 +314,23 @@ class Session:
                 continue
             debut = time.monotonic()
             for m in actives:
+                # envoi vers le serveur en retard (connexion lente) : on saute l'image plutôt que de
+                # retarder les messages d'état derrière (sinon le serveur coupe : horodatage hors tolérance)
+                if self.ws.transport.get_write_buffer_size() > VIDEO_TAMPON_MAX:
+                    continue
                 pic = await asyncio.to_thread(m.printer.camera.instant_pic)
-                if isinstance(pic, bytes) and len(pic) < LIMITES["morceau_octets"]:
+                if not isinstance(pic, bytes):
+                    # ex. « HTTP 503 » : le service caméra de l'imprimante (mjpg-streamer) ne tourne pas
+                    erreur = str(pic.get("error") if isinstance(pic, dict) else pic)
+                    if erreurs.get(m.id) != erreur:
+                        log.warning("caméra %s indisponible : %s", m.id, erreur)
+                        erreurs[m.id] = erreur
+                    continue
+                if erreurs.pop(m.id, None):
+                    log.info("caméra %s de nouveau disponible", m.id)
+                if len(pic) < LIMITES["morceau_octets"]:
                     await self.envoyer_binaire({"type": "video", "machine": m.id}, pic)
-            await asyncio.sleep(max(0.0, 0.2 - (time.monotonic() - debut)))
+            await asyncio.sleep(max(0.0, intervalle - (time.monotonic() - debut)))
 
 
 # ---------------------------------------------------------------------------- boucle principale

@@ -4,3 +4,4 @@ pki/
 data/
 config.json
 .env
+data-dev/

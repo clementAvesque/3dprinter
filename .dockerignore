@@ -1,10 +1,15 @@
-# l'image ne contient que le serveur et le protocole commun ; jamais de secrets ni de données
+# l'image ne contient que le serveur, le protocole commun et les sources du site client ; jamais de secrets ni de données
 *
 !serveur/
 !protocole/
+!web_printer_user/front/
+web_printer_user/front/node_modules
+web_printer_user/front/dist
 serveur/node_modules
 serveur/pki
 serveur/data
+serveur/data-dev
+serveur/dev.env
 serveur/config.json
 serveur/test
 serveur/.env

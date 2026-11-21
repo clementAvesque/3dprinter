@@ -16,7 +16,7 @@ Copié de `config.example.json`. Une entrée par imprimante :
 | `serveur` | adresse du WebSocket du serveur (`wss://agent.ton-domaine.fr:8443/ws` en ligne) |
 | `empreinte_serveur` | vide = lue dans `secrets/empreinte_serveur.txt` (créée par `npm run pki`) |
 | `console_gcode` | `false` par défaut : la console gcode du site est refusée ici |
-| `enregistrement_auto` | filme chaque impression. Si `web_printer` tourne aussi sur ce PC, ne le laisser actif que d'un côté |
+| `enregistrement_auto` | filme chaque impression. Si `web_printer_admin` tourne aussi sur ce PC, ne le laisser actif que d'un côté |
 | `limites` | températures max acceptées, en plus des bornes du protocole |
 
 ## Lancer
@@ -50,7 +50,7 @@ Ensuite : `journalctl -u imprimantes-agent -f` (journal), `sudo systemctl restar
 Ne lance pas `python agent.py` à la main tant que le service tourne : ce serait un 2e agent, refusé.
 
 Les gcodes de l'imprimante sont re-téléchargés tout seuls au premier démarrage ; les vidéos sont enregistrées
-sur la carte SD (`client_printer/image/videos`). Si `web_printer` tourne encore sur le PC, chaque print serait
+sur la carte SD (`client_printer/image/videos`). Si `web_printer_admin` tourne encore sur le PC, chaque print serait
 filmé deux fois : coupe `enregistrement_auto` d'un côté.
 
 ## Ce que l'agent refuse, même si le serveur était piraté

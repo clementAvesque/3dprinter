@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Suivi 3D · Imprimantes</title>
+  <meta name="theme-color" content="#1a1d23">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icones/icone.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icones/apple-touch-icon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="barre">
+  <div class="marque">
+    <span id="point" class="point"></span>
+    <div>
+      <h1>Imprimantes</h1>
+      <span id="agent-etat" class="muted small">connexion…</span>
+    </div>
+  </div>
+  <nav class="nav">
+    <a href="index.html">Imprimer</a>
+    <a href="suivi.html" class="actif" aria-current="page">Suivi 3D</a>
+    <a href="galerie.html">Galerie</a>
+    <a href="boutique.html">Boutique</a>
+  </nav>
+  <select id="machine" title="machine" hidden></select>
+  <span id="badge" class="badge">…</span>
+  <a id="utilisateur" class="small lien-profil" href="profil.html" title="Mon profil"></a>
+  <button id="deconnexion" class="fantome">Se déconnecter</button>
+</header>
+
+<main class="suivi">
+
+  <section class="vue3d" id="vue">
+    <div class="outils">
+      <button class="fantome" data-vue="iso">3D</button>
+      <button class="fantome" data-vue="dessus">Dessus</button>
+      <button class="fantome" data-vue="face">Face</button>
+    </div>
+    <div id="vue-message" class="vue-message muted">Aucune impression en cours : choisis un fichier à droite.</div>
+    <div class="curseur-couche">
+      <span class="muted small">Couche</span>
+      <input id="couche" type="range" min="0" max="0" value="0" disabled>
+      <b id="couche-txt" class="mono">—</b>
+    </div>
+  </section>
+
+  <aside class="panneau">
+    <section class="card">
+      <div class="card-tete">
+        <h2>Impression</h2>
+        <label class="small muted interrupteur"><input id="direct" type="checkbox" checked> Suivre en direct</label>
+      </div>
+      <p id="fichier" class="titre-fichier">Aucune impression</p>
+      <div class="progression"><div id="barre"></div></div>
+      <div class="stats">
+        <div>Avancement<b id="pct">—</b></div>
+        <div>Couche<b id="couche-impr">—</b></div>
+        <div>Écoulé<b id="ecoule">—</b></div>
+        <div>Restant<b id="restant">—</b></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Filament</h2>
+      <div class="fil-bloc">
+        <span class="muted small">Prévu par le fichier</span>
+        <div id="fil-prevu" class="fil-liste">—</div>
+      </div>
+      <div class="fil-bloc">
+        <span class="muted small">Utilisé</span>
+        <div id="fil-utilise" class="fil-liste">—</div>
+      </div>
+      <p id="fil-alerte" class="alerte small" hidden></p>
+    </section>
+
+    <section class="card">
+      <h2>Buse</h2>
+      <p class="mono position">X <b id="bx">—</b> · Y <b id="by">—</b> · Z <b id="bz">—</b></p>
+      <div class="stats">
+        <div>Buse<b id="t-buse">—</b></div>
+        <div>Plateau<b id="t-lit">—</b></div>
+        <div>Vitesse<b id="vitesse">—</b></div>
+        <div>Ventilateur<b id="ventilo">—</b></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Fichier affiché</h2>
+      <select id="choix"></select>
+      <p id="infos" class="muted small"></p>
+      <ul id="legende" class="legende-types"></ul>
+    </section>
+  </aside>
+
+</main>
+
+<div id="toasts" class="toasts"></div>
+<script src="config.js"></script>
+<script src="commun.js"></script>
+<script src="filament.js"></script>
+<script src="machine.js"></script>
+<script type="module" src="suivi.js"></script>
+</body>
+</html>

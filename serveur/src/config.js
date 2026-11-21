@@ -35,7 +35,35 @@ const DEFAUT = {
     cle: 'pki/serveur.key.pem',
   },
   donnees: 'data',
+  // site client compilé (npm run build dans web_printer_user/front), servi par le serveur à la racine ;
+  // vide = API seule. Dans l'image Docker : /app/web_printer_user/front/dist (voir Dockerfile)
+  siteClient: '../web_printer_user/front/dist',
+  // découpe des devis par OrcaSlicer : commande à lancer (vide = pas de découpe, les devis restent « attente »).
+  // Dans l'image Docker : ORCA_CMD="xvfb-run -a /opt/orca/AppRun" (voir Dockerfile)
+  orca: { commande: '', profils: 'orca', delaiMs: 15 * 60e3, intervalleMs: 10e3 },
   uploadMaxOctets: 200 * 1024 * 1024,
+  // boutique (site client) : voir web_printer_user/CONCEPTION.md
+  boutique: {
+    // adresse publique du site client, utilisée dans les liens des e-mails (jamais l'en-tête Host :
+    // un attaquant pourrait sinon faire pointer le lien « mot de passe oublié » vers son site)
+    urlSite: 'https://passerelle-printer-server.fly.dev',
+    prixGrammeCts: 20,                // 0,20 € par gramme de PLA
+    emballageG: 50,                   // ajouté au poids des pièces pour la livraison
+    livraison: [                      // poids du colis jusqu'à maxG -> prix
+      { maxG: 250, cts: 500 }, { maxG: 500, cts: 650 }, { maxG: 1000, cts: 800 }, { maxG: 2000, cts: 1000 },
+    ],
+    livraisonParKgEnPlusCts: 200,     // au-delà de la dernière tranche, par kg entamé
+    validationJours: 10,              // sans validation : remboursement automatique
+    envoiJours: 60,                   // après validation : limite d'envoi
+    objectifEnvoiJours: 14,
+    stlMaxOctets: 50 * 1024 * 1024,
+    stlConservationJours: 30,         // STL jamais commandé
+    stlCommandeConservationJours: 730, // STL d'une commande payée : 2 ans
+    session: { dureeMaxMs: 30 * 864e5, inactiviteMs: 7 * 864e5 },
+    // e-mails : "journal" = écrits dans les logs du serveur (tant qu'aucun service n'est choisi),
+    // "memoire" = gardés en mémoire (tests), "brevo" = vrais envois (voir src/courriel.js)
+    courriel: { mode: 'journal', expediteur: 'Impression 3D <no-reply@example.com>', cleApi: '', templateId: '' },
+  },
   session: {
     dureeMaxMs: 12 * 3600e3,
     inactiviteMs: 30 * 60e3,
@@ -71,6 +99,13 @@ function depuisEnv(c, env = process.env) {
   poser(c.agent, 'ipsAutorisees', liste(env.AGENT_IPS_AUTORISEES));
   poser(c.agent, 'proxyProtocol', vrai(env.AGENT_PROXY_PROTOCOL));
   poser(c, 'donnees', env.DONNEES);
+  poser(c, 'siteClient', env.SITE_CLIENT);
+  poser(c.orca, 'commande', env.ORCA_CMD);
+  poser(c.boutique, 'urlSite', env.URL_SITE);
+  poser(c.boutique.courriel, 'mode', env.COURRIEL_MODE);
+  poser(c.boutique.courriel, 'expediteur', env.COURRIEL_EXPEDITEUR);
+  poser(c.boutique.courriel, 'cleApi', env.COURRIEL_CLE_API);     // secret : fly secrets, jamais dans fly.toml
+  poser(c.boutique.courriel, 'templateId', env.COURRIEL_TEMPLATE_ID);   // numéro donné par scripts/brevo_template.py
   // certificats en base64 (fly secrets) : prioritaires sur les fichiers pki/
   const pem = (v) => (v ? Buffer.from(v, 'base64') : null);
   c.pkiPem = { ca: pem(env.PKI_CA_B64), cert: pem(env.PKI_CERT_B64), cle: pem(env.PKI_CLE_B64) };
@@ -86,6 +121,8 @@ function charger(fichier = process.env.CONFIG || path.join(RACINE, 'config.json'
   const abs = (p) => (path.isAbsolute(p) ? p : path.join(RACINE, p));
   c.pki = { ca: abs(c.pki.ca), cert: abs(c.pki.cert), cle: abs(c.pki.cle) };
   c.donnees = abs(c.donnees);
+  c.siteClient = c.siteClient ? abs(c.siteClient) : '';
+  c.orca.profils = abs(c.orca.profils);
   fs.mkdirSync(c.donnees, { recursive: true });
   return c;
 }
