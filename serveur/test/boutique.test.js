@@ -335,6 +335,13 @@ test('découpe : le serveur découpe le devis -> poids, prix, aperçu réservé 
   assert.equal((await bob.req('GET', `/devis/${d.id}/trajets`)).statut, 404);
   assert.equal((await carol.req('GET', `/devis/${d.id}/gcode`)).statut, 404, 'pas de route gcode côté client');
 
+  // Stripe pas configuré sur ce serveur : la commande le dit, sans rien créer
+  const adr = await carol.req('POST', '/adresses', { nom_complet: 'Carol', ligne1: '2 rue Test', code_postal: '69001', ville: 'Lyon' });
+  const cmd = await carol.req('POST', '/commandes', { devis_id: d.id, adresse_id: adr.json.id });
+  assert.equal(cmd.statut, 503);
+  assert.equal(cmd.json.erreur, 'paiement_non_configure');
+  assert.equal(srv.db.prepare('SELECT count(*) n FROM commandes WHERE devis_id = ?').get(d.id).n, 0);
+
   // « rapide » : 0,28 mm (la Kobra 3 0.4 n'accepte pas 0,4 mm), sans lissage
   const rapide = await devisDecoupe(carol, (await creer({ proprete: 'rapide' }, 1)).json.id);
   assert.match(gcodeDuDevis(rapide.id), /; layer_height = 0\.28\n; ironing_type = no ironing/);
@@ -345,6 +352,8 @@ test('découpe : le serveur découpe le devis -> poids, prix, aperçu réservé 
   assert.match(panne.erreur, /La découpe a échoué/);
   const deux = await devisDecoupe(carol, (await creer({ remplissage_pct: 98 }, 1)).json.id);
   assert.match(deux.erreur, /ne tiennent pas toutes sur un seul plateau/);
+  const memoire = await devisDecoupe(carol, (await creer({ remplissage_pct: 97 }, 1)).json.id);
+  assert.match(memoire.erreur, /trop chargé pour être découpé en une fois/);
   assert.equal((await carol.req('GET', `/devis/${panne.id}/trajets`)).statut, 409);
 
   // relance d'un devis en erreur : de nouveau en file, redécoupé ; impossible sur un devis prêt
@@ -362,7 +371,51 @@ test('découpe : le serveur découpe le devis -> poids, prix, aperçu réservé 
   const trop = await creer({}, 1);
   assert.equal(trop.statut, 429);
   assert.equal(trop.json.erreur, 'trop_de_devis');
+
+  // progression : pendant la découpe (temps écoulé + estimation), dans la file (devis devant)
+  srv.db.prepare('UPDATE devis SET decoupe_debut_le = ? WHERE id = ?').run(Date.now() - 5000, ids[0]);
+  const p = (await carol.req('GET', `/devis/${ids[0]}`)).json.progression;
+  assert.ok(p.depuis_s >= 4 && p.depuis_s <= 7, JSON.stringify(p));
+  assert.ok(p.estimee_s >= 15);
+  assert.equal((await carol.req('DELETE', `/devis/${ids[0]}`)).json.erreur, 'decoupe_en_cours');
+  assert.equal(d.progression, null, 'devis prêt : plus de progression');
   for (const id of ids) srv.db.prepare('DELETE FROM devis WHERE id = ?').run(id);
+});
+
+test('suppression d\'un devis : devis, STL (base + disque) et gcode effacés ; STL partagé gardé', async () => {
+  const carol = new Client();
+  carol.csrf = (await carol.req('POST', '/connexion', { email: 'carol@test.local', motdepasse: 'un-mot-de-passe-solide' })).json.csrf;
+  const reglages = { remplissage_pct: 15, couches_surface: 3, proprete: 'fine' };
+  const envoyer = async (nom) => (await carol.req('POST', '/fichiers', envoiStl(nom, cube(12)))).json.id;
+  const creer = async (fichiers) => (await devisDecoupe(carol, (await carol.req('POST', '/devis', { imprimante_id: 'kobra-1', reglages,
+    pieces: fichiers.map((id) => ({ fichier_id: id, quantite: 1 })) })).json.id));
+
+  const seul = await envoyer('seul.stl'), partage = await envoyer('partage.stl');
+  const d1 = await creer([seul, partage]);
+  const d2 = await creer([partage]);
+  assert.equal(d1.statut, 'pret');
+  const fichierDisque = (id) => srv.db.prepare('SELECT chemin FROM fichiers_stl WHERE id = ?').get(id)?.chemin;
+  const disqueSeul = path.join(srv.config.donnees, fichierDisque(seul));
+  const gcode = path.join(srv.config.donnees, srv.db.prepare('SELECT gcode_chemin FROM devis WHERE id = ?').get(d1.id).gcode_chemin);
+  assert.ok(fs.existsSync(disqueSeul) && fs.existsSync(gcode));
+
+  // un autre client ne peut pas le supprimer
+  const bob = new Client();
+  bob.csrf = (await bob.req('POST', '/connexion', { email: 'bob@test.local', motdepasse: 'un-mot-de-passe-solide' })).json.csrf;
+  assert.equal((await bob.req('DELETE', `/devis/${d1.id}`)).statut, 404);
+
+  assert.equal((await carol.req('DELETE', `/devis/${d1.id}`)).statut, 200);
+  assert.equal((await carol.req('GET', `/devis/${d1.id}`)).statut, 404);
+  assert.equal(fichierDisque(seul), undefined, 'STL retiré de la base');
+  assert.ok(!fs.existsSync(disqueSeul), 'STL retiré du disque');
+  assert.ok(!fs.existsSync(gcode), 'gcode supprimé');
+  assert.ok(!fs.readdirSync(path.join(srv.config.donnees, 'gcode')).some((n) => n.startsWith(`devis-${d1.id}.`)), 'aperçu supprimé');
+  // le STL partagé reste pour l'autre devis, toujours prêt
+  assert.ok(fichierDisque(partage));
+  assert.equal((await carol.req('GET', `/devis/${d2.id}`)).json.statut, 'pret');
+  // en supprimant le dernier devis qui l'utilise, il part aussi
+  assert.equal((await carol.req('DELETE', `/devis/${d2.id}`)).statut, 200);
+  assert.equal(fichierDisque(partage), undefined);
 });
 
 test('adresses : ajout, liste, suppression', async () => {

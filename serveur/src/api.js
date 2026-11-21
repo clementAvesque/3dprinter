@@ -556,6 +556,10 @@ function creerApi({ config, db, hub, journal, courriel = creerCourriel(config), 
   });
   app.use('/api/client', cl);
 
+  // webhooks Stripe : corps brut (la signature porte sur les octets exacts), aucune session ni CSRF :
+  // seule la signature HMAC (secret partagé avec Stripe) fait foi
+  app.post('/api/stripe/webhook', express.raw({ type: '*/*', limit: '512kb' }), asynchrone(boutique.webhookStripe));
+
   // tâches de la boutique toutes les heures (purges, rappels, remboursements automatiques)
   const tache = () => boutique.tacheHoraire().catch((e) => console.error('tâche boutique :', e));
   setTimeout(tache, 60e3).unref();

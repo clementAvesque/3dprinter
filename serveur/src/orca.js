@@ -36,7 +36,13 @@ function creerDecoupeur({ config, db, calculerPrix }) {
 
   const q = {
     suivant: db.prepare("SELECT * FROM devis WHERE statut = 'attente' ORDER BY id LIMIT 1"),
-    prendre: db.prepare("UPDATE devis SET statut = 'decoupe', erreur = NULL WHERE id = ? AND statut = 'attente'"),
+    prendre: db.prepare("UPDATE devis SET statut = 'decoupe', erreur = NULL, decoupe_debut_le = ? WHERE id = ? AND statut = 'attente'"),
+    triangles: db.prepare(`SELECT coalesce(sum(f.triangles * p.quantite), 0) n FROM devis_pieces p
+      JOIN fichiers_stl f ON f.id = p.fichier_id WHERE p.devis_id = ?`),
+    historique: db.prepare(`SELECT (d.decoupe_le - d.decoupe_debut_le) / 1000.0 duree,
+        (SELECT sum(f.triangles * p.quantite) FROM devis_pieces p JOIN fichiers_stl f ON f.id = p.fichier_id WHERE p.devis_id = d.id) triangles
+      FROM devis d WHERE d.statut = 'pret' AND d.decoupe_debut_le IS NOT NULL ORDER BY d.decoupe_le DESC LIMIT 20`),
+    devant: db.prepare("SELECT id, statut, decoupe_debut_le FROM devis WHERE statut = 'decoupe' OR (statut = 'attente' AND id < ?)"),
     pieces: db.prepare(`SELECT p.quantite, f.chemin, f.nom_origine FROM devis_pieces p JOIN fichiers_stl f ON f.id = p.fichier_id
       WHERE p.devis_id = ? ORDER BY p.id`),
     imprimante: db.prepare('SELECT * FROM imprimantes WHERE id = ?'),
@@ -48,23 +54,61 @@ function creerDecoupeur({ config, db, calculerPrix }) {
   // découpe interrompue par un redémarrage du serveur : on la reprend
   db.prepare("UPDATE devis SET statut = 'attente' WHERE statut = 'decoupe'").run();
 
+  // ----- estimation de la durée (barre de progression du client) -----
+  // Orca ne donne pas d'avancement en ligne de commande : la durée est estimée d'après le nombre de triangles,
+  // à la vitesse mesurée sur les dernières découpes (par défaut : 28 pièces, ~400 000 triangles -> 458 s sur Fly).
+  const BASE_S = 15;
+  const PAR_TRIANGLE_DEFAUT_S = 1.1e-3;
+  function vitesse() {
+    let duree = 0, triangles = 0;
+    for (const h of q.historique.all()) {
+      if (h.duree > 0 && h.triangles > 0) { duree += Math.max(0, h.duree - BASE_S); triangles += h.triangles; }
+    }
+    return triangles >= 50000 ? duree / triangles : PAR_TRIANGLE_DEFAUT_S;
+  }
+  const estimer = (id, v = vitesse()) => Math.round(BASE_S + q.triangles.get(id).n * v);
+
+  // { depuis_s, estimee_s } pendant la découpe ; { avant, attente_s, estimee_s } dans la file ; null sinon
+  function progression(d, maintenant = Date.now()) {
+    if (!['attente', 'decoupe'].includes(d.statut)) return null;
+    const v = vitesse();
+    if (d.statut === 'decoupe') {
+      return { depuis_s: Math.max(0, Math.round((maintenant - (d.decoupe_debut_le || maintenant)) / 1000)), estimee_s: estimer(d.id, v) };
+    }
+    const devant = q.devant.all(d.id);
+    const attente = devant.reduce((s, x) => s + (x.statut === 'decoupe'
+      ? Math.max(0, estimer(x.id, v) - (maintenant - (x.decoupe_debut_le || maintenant)) / 1000) : estimer(x.id, v)), 0);
+    return { avant: devant.length, attente_s: Math.round(attente), estimee_s: estimer(d.id, v) };
+  }
+
   let occupe = false;
   let arrete = false;
   let enfant = null;
 
   class ErreurDecoupe extends Error {}   // message montré au client
 
+  // Orca est lancé par xvfb-run : on tue tout le groupe de processus, sinon Orca survivrait à son lanceur
+  // et garderait sa mémoire (Linux ; sous Windows, pour les essais locaux, le processus seul)
+  const groupe = process.platform !== 'win32';
+  function tuer() {
+    if (!enfant) return;
+    try {
+      if (groupe) process.kill(-enfant.pid, 'SIGKILL'); else enfant.kill('SIGKILL');
+    } catch { /* déjà fini */ }
+  }
+
   function lancerOrca(args, dossier) {
     return new Promise((ok, ko) => {
       const env = { ...process.env, HOME: dossier, XDG_CONFIG_HOME: path.join(dossier, 'config'), LC_ALL: 'C.UTF-8' };
-      enfant = spawn(commande[0], [...commande.slice(1), ...args], { cwd: dossier, env, stdio: ['ignore', 'pipe', 'pipe'] });
+      enfant = spawn(commande[0], [...commande.slice(1), ...args], { cwd: dossier, env, stdio: ['ignore', 'pipe', 'pipe'], detached: groupe });
       let sortie = '';
+      let tropLong = false;
       const garder = (d) => { sortie = (sortie + d).slice(-4000); };
       enfant.stdout.on('data', garder);
       enfant.stderr.on('data', garder);
-      const minuteur = setTimeout(() => enfant?.kill('SIGKILL'), O.delaiMs);
+      const minuteur = setTimeout(() => { tropLong = true; tuer(); }, O.delaiMs);
       enfant.on('error', (e) => { clearTimeout(minuteur); enfant = null; ko(e); });
-      enfant.on('close', (code, signal) => { clearTimeout(minuteur); enfant = null; ok({ code, signal, sortie }); });
+      enfant.on('close', (code, signal) => { clearTimeout(minuteur); enfant = null; ok({ code, signal, sortie, tropLong }); });
     });
   }
 
@@ -101,7 +145,12 @@ function creerDecoupeur({ config, db, calculerPrix }) {
       const r = await lancerOrca(['--arrange', '1', '--orient', '0', '--slice', '0',
         '--load-settings', `${fm};${fp}`, '--load-filaments', ff, '--outputdir', sortie, ...stls], dossier);
       const gcodes = (await fsp.readdir(sortie)).filter((n) => n.toLowerCase().endsWith('.gcode'));
-      if (r.signal === 'SIGKILL') throw new ErreurDecoupe('La découpe a pris trop de temps. Essaie avec moins de pièces.');
+      if (r.tropLong) throw new ErreurDecoupe('La découpe a pris trop de temps. Essaie avec moins de pièces.');
+      // tué par le système (code 137 = signal 9) : plus de mémoire, même avec la mémoire d'échange
+      if (r.code === 137 || r.signal === 'SIGKILL') {
+        throw new ErreurDecoupe('Ce plateau est trop chargé pour être découpé en une fois : réessaie dans quelques minutes, '
+          + 'ou répartis tes pièces sur plusieurs devis.');
+      }
       if (gcodes.length > 1) throw new ErreurDecoupe('Tes pièces ne tiennent pas toutes sur un seul plateau : réduis les quantités ou fais plusieurs devis.');
       if (r.code !== 0 || !gcodes.length) {
         throw new Error(`Orca a échoué (code ${r.code}${r.signal ? `, ${r.signal}` : ''}) : ${r.sortie.trim().split('\n').slice(-8).join(' | ')}`);
@@ -129,12 +178,19 @@ function creerDecoupeur({ config, db, calculerPrix }) {
     try {
       let devis;
       while (!arrete && (devis = q.suivant.get())) {
-        if (!q.prendre.run(devis.id).changes) continue;
+        if (!q.prendre.run(Date.now(), devis.id).changes) continue;
         const debut = Date.now();
         try {
           await decouper(devis);
           console.log(`[orca] devis ${devis.id} découpé en ${Math.round((Date.now() - debut) / 1000)} s`);
         } catch (e) {
+          if (arrete) {
+            // serveur en train de s'arrêter (mise à jour, redémarrage) : Orca a été arrêté par nous, ce n'est pas
+            // une erreur du devis ; il reprend au prochain démarrage
+            db.prepare("UPDATE devis SET statut = 'attente' WHERE id = ? AND statut = 'decoupe'").run(devis.id);
+            console.log(`[orca] devis ${devis.id} : découpe interrompue par l'arrêt du serveur, reprise au redémarrage`);
+            continue;
+          }
           console.error(`[orca] devis ${devis.id} : ${e.message}`);
           q.erreur.run(e instanceof ErreurDecoupe ? e.message : 'La découpe a échoué. Nous avons été prévenus ; réessaie plus tard.',
             Date.now(), devis.id);
@@ -151,6 +207,7 @@ function creerDecoupeur({ config, db, calculerPrix }) {
   return {
     actif: commande.length > 0,
     reveiller: () => setImmediate(() => tour()),
+    progression,
     fichiers: (id) => fichiersDevis(dossierGcode, id),
     // supprime gcode et aperçu d'un devis (devis supprimé, ou commande finie depuis longtemps)
     effacer(id) {
@@ -159,7 +216,7 @@ function creerDecoupeur({ config, db, calculerPrix }) {
     async arreter() {
       arrete = true;
       clearInterval(minuteur);
-      enfant?.kill('SIGKILL');
+      tuer();
       while (occupe) await new Promise((r) => setTimeout(r, 20));
     },
   };

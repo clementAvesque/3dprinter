@@ -34,7 +34,7 @@ export const useAtelier = defineStore('atelier', {
       this.erreurs = [];
       for (const f of fichiers) {
         if (!/\.stl$/i.test(f.name)) { this.erreurs.push(`${f.name} : seuls les fichiers .stl sont acceptés`); continue; }
-        if (f.size > 50 * 1024 * 1024) { this.erreurs.push(`${f.name} : 50 Mo maximum`); continue; }
+        if (f.size > 200 * 1024 * 1024) { this.erreurs.push(`${f.name} : 200 Mo maximum`); continue; }
         try {
           const { geometrie, dims, volume } = await lireStl(f);
           this.pieces.push({ id: suivant++, nom: f.name, fichier: markRaw(f), geometrie: markRaw(geometrie), dims, volume, quantite: 1 });

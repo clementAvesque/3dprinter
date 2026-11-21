@@ -210,6 +210,14 @@ function schemaBoutique(db) {
     CREATE INDEX IF NOT EXISTS lot_pieces_lot ON lot_pieces(lot_id);
   `);
 
+  // colonnes ajoutées après la mise en ligne (bases existantes : ajoutées au démarrage)
+  const ajouterColonne = (table, colonne, type) => {
+    if (!db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === colonne)) {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN ${colonne} ${type}`);
+    }
+  };
+  ajouterColonne('devis', 'decoupe_debut_le', 'INTEGER');     // début de la découpe : barre de progression du client
+
   const inserer = db.prepare(`INSERT OR IGNORE INTO imprimantes
     (id, nom, plateau_x_mm, plateau_y_mm, plateau_z_mm, buse_mm, profil_orca, disponible) VALUES (?, ?, ?, ?, ?, ?, ?, 1)`);
   for (const i of IMPRIMANTES_DEFAUT) inserer.run(i.id, i.nom, i.x, i.y, i.z, i.buse, i.profil);

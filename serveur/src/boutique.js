@@ -2,8 +2,8 @@
 // Boutique : fichiers STL, devis, adresses et commandes côté client (/api/client), gestion côté admin
 // (/api/v1/boutique), échéances, rappels et tâches planifiées. Voir web_printer_user/CONCEPTION.md.
 //
-// Découpe des devis : src/orca.js (OrcaSlicer sur le serveur). Pas encore branchés (étapes suivantes de la
-// conception) : paiement Stripe (remboursements : « paiement_non_configure »), regroupement en lots.
+// Découpe des devis : src/orca.js (OrcaSlicer sur le serveur). Paiement : src/paiements.js (Stripe Checkout,
+// webhook signé, remboursements). Pas encore branché (étape suivante de la conception) : regroupement en lots.
 // L'admin ne reçoit jamais de fichier venu du navigateur d'un client : seulement le gcode découpé par le serveur.
 
 const crypto = require('node:crypto');
@@ -101,6 +101,8 @@ function creerBoutique({ config, db, journal, courriel, paiements, clients, exig
       prix_matiere_cts: d.prix_matiere_cts, livraison_cts: d.livraison_cts,
       total_cts: d.prix_matiere_cts == null ? null : d.prix_matiere_cts + d.livraison_cts,
       cree_le: d.cree_le, decoupe_le: d.decoupe_le,
+      commande: db.prepare('SELECT id, statut FROM commandes WHERE devis_id = ?').get(d.id) || null,
+      progression: decoupeur.progression(d),
       pieces: pieces.map((p) => ({ id: p.id, fichier_id: p.fichier_id, nom: p.nom_origine, quantite: p.quantite,
         dims_mm: [p.dim_x_mm, p.dim_y_mm, p.dim_z_mm], pos_mm: [p.pos_x_mm, p.pos_y_mm], rotation_deg: p.rotation_deg,
         poids_g: p.poids_g, fichier_disponible: !!p.chemin })),
@@ -128,6 +130,16 @@ function creerBoutique({ config, db, journal, courriel, paiements, clients, exig
       SELECT p.fichier_id FROM devis_pieces p JOIN commandes c ON c.devis_id = p.devis_id WHERE c.id = ?)`)
       .run(B.stlCommandeConservationJours * JOUR, commandeId);
     return true;
+  }
+
+  // facture à numérotation continue par année (obligatoire en France) : 2026-000001, 2026-000002...
+  function emettreFacture(commande, maintenant = Date.now()) {
+    const an = new Date(maintenant).getFullYear();
+    const dernier = db.prepare('SELECT numero FROM factures WHERE numero LIKE ? ORDER BY numero DESC LIMIT 1').get(`${an}-%`);
+    const numero = `${an}-${String((dernier ? Number(dernier.numero.slice(5)) : 0) + 1).padStart(6, '0')}`;
+    db.prepare('INSERT OR IGNORE INTO factures (commande_id, numero, total_cts, emise_le) VALUES (?, ?, ?, ?)')
+      .run(commande.id, numero, commande.total_cts, maintenant);
+    return db.prepare('SELECT * FROM factures WHERE commande_id = ?').get(commande.id);
   }
 
   async function prevenirClient(commande, sujet, texte) {
@@ -206,7 +218,7 @@ function creerBoutique({ config, db, journal, courriel, paiements, clients, exig
   // ================================================================ routes client (/api/client)
 
   const rc = express.Router();
-  const { connecte } = clients;
+  const { connecte, verifie } = clients;
 
   rc.get('/imprimantes', (req, res) => {
     res.json(q.imprimantes.all().filter((i) => i.disponible).map(imprimantePublique));
@@ -350,6 +362,42 @@ function creerBoutique({ config, db, journal, courriel, paiements, clients, exig
     res.json(devisComplet(d));
   });
 
+  // suppression d'un devis par son client : le devis, ses fichiers STL (base + disque) et son gcode.
+  // Un STL utilisé aussi par un autre devis est gardé pour celui-ci. Impossible une fois le devis commandé
+  // (paiement en cours ou fait : le gcode sert à l'impression) ou pendant sa découpe.
+  rc.delete('/devis/:id', connecte, (req, res) => {
+    const d = db.prepare('SELECT * FROM devis WHERE id = ? AND client_id = ?').get(Number(req.params.id), req.client.id);
+    if (!d) return res.status(404).json({ erreur: 'devis_inconnu' });
+    if (d.statut === 'decoupe') return res.status(409).json({ erreur: 'decoupe_en_cours' });
+    const c = db.prepare('SELECT id, statut FROM commandes WHERE devis_id = ?').get(d.id);
+    if (c && c.statut !== 'abandonnee') return res.status(409).json({ erreur: 'devis_commande', detail: `commande ${c.id}` });
+
+    const fichiers = db.prepare('SELECT DISTINCT f.* FROM devis_pieces p JOIN fichiers_stl f ON f.id = p.fichier_id WHERE p.devis_id = ?').all(d.id);
+    db.exec('BEGIN');
+    try {
+      if (c) {
+        // commande jamais payée : elle part avec le devis (les événements Stripe gardent leur trace, sans lien)
+        db.prepare('UPDATE evenements_stripe SET commande_id = NULL WHERE commande_id = ?').run(c.id);
+        db.prepare('DELETE FROM commandes WHERE id = ?').run(c.id);
+      }
+      db.prepare('DELETE FROM devis WHERE id = ?').run(d.id);           // devis_pieces : supprimées avec lui
+      for (const f of fichiers) {
+        if (!db.prepare('SELECT 1 FROM devis_pieces WHERE fichier_id = ? LIMIT 1').get(f.id)) {
+          db.prepare('DELETE FROM fichiers_stl WHERE id = ?').run(f.id);
+        }
+      }
+      db.exec('COMMIT');
+    } catch (e) {
+      db.exec('ROLLBACK');
+      throw e;
+    }
+    // fichiers sur le disque : seulement après la suppression en base (rien d'effacé si elle a échoué)
+    for (const f of fichiers) if (!q.fichier.get(f.id)) supprimerFichierDisque(f);
+    decoupeur.effacer(d.id);
+    journal('client.devis.supprimer', { req, cible: `${req.client.email} devis ${d.id}`, resultat: 'ok', detail: `${fichiers.length} fichier(s)` });
+    res.json({ ok: true });
+  });
+
   // découpe en erreur (panne passagère d'Orca, par ex.) : le client la relance sans tout redéposer
   rc.post('/devis/:id/relancer', connecte, (req, res) => {
     const d = db.prepare('SELECT * FROM devis WHERE id = ? AND client_id = ?').get(Number(req.params.id), req.client.id);
@@ -417,6 +465,52 @@ function creerBoutique({ config, db, journal, courriel, paiements, clients, exig
 
   // ------------------------------------------------ commandes
 
+  // commander un devis découpé : le montant vient du devis (calculé par le serveur), jamais du navigateur.
+  // Retourne l'adresse de la page de paiement Stripe.
+  rc.post('/commandes', verifie, asynchrone(async (req, res) => {
+    const { devis_id: devisId, adresse_id: adresseId, ...reste } = req.body || {};
+    if (Object.keys(reste).length) return res.status(400).json({ erreur: 'champ_inconnu' });
+    const d = db.prepare('SELECT * FROM devis WHERE id = ? AND client_id = ?').get(Number(devisId), req.client.id);
+    if (!d) return res.status(404).json({ erreur: 'devis_inconnu' });
+    if (d.statut !== 'pret' || d.prix_matiere_cts == null) return res.status(409).json({ erreur: 'devis_pas_pret' });
+    const a = db.prepare('SELECT * FROM adresses WHERE id = ? AND client_id = ?').get(Number(adresseId), req.client.id);
+    if (!a) return res.status(400).json({ erreur: 'adresse_inconnue' });
+    if (!paiements.configure) return res.status(503).json({ erreur: 'paiement_non_configure' });
+    const existante = db.prepare('SELECT * FROM commandes WHERE devis_id = ?').get(d.id);
+    if (existante && !['en_attente_paiement', 'abandonnee'].includes(existante.statut)) {
+      return res.status(409).json({ erreur: 'deja_commandee', detail: `commande ${existante.id}` });
+    }
+
+    const adresse = JSON.stringify({ ligne1: a.ligne1, ligne2: a.ligne2, code_postal: a.code_postal, ville: a.ville,
+      pays: a.pays, telephone: a.telephone });
+    const now = Date.now();
+    const total = d.prix_matiere_cts + d.livraison_cts;
+    let id;
+    if (existante) {
+      // nouvel essai de paiement : l'ancienne page de paiement est fermée chez Stripe (pas de double paiement)
+      if (existante.stripe_session_id) await paiements.expirerSession(existante.stripe_session_id).catch(() => {});
+      db.prepare(`UPDATE commandes SET statut = 'en_attente_paiement', livraison_nom = ?, livraison_adresse = ?, sous_total_cts = ?,
+        livraison_cts = ?, total_cts = ?, stripe_session_id = NULL, cree_le = ? WHERE id = ?`)
+        .run(a.nom_complet, adresse, d.prix_matiere_cts, d.livraison_cts, total, now, existante.id);
+      id = existante.id;
+    } else {
+      id = Number(db.prepare(`INSERT INTO commandes (client_id, devis_id, livraison_nom, livraison_adresse, sous_total_cts,
+        livraison_cts, total_cts, cree_le) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(req.client.id, d.id, a.nom_complet, adresse, d.prix_matiere_cts, d.livraison_cts, total, now).lastInsertRowid);
+    }
+    try {
+      const s = await paiements.creerSession({ commande: q.commande.get(id), email: req.client.email, devisId: d.id,
+        urlSite: B.urlSite.replace(/\/+$/, '') });
+      db.prepare('UPDATE commandes SET stripe_session_id = ? WHERE id = ?').run(s.id, id);
+      journal('client.commande', { req, cible: `${req.client.email} commande ${id}`, resultat: 'ok', detail: `${total} cts` });
+      res.status(201).json({ commande_id: id, url: s.url });
+    } catch (e) {
+      if (!(e instanceof ErreurPaiement)) throw e;
+      console.error(`[stripe] commande ${id} : ${e.message}`);
+      res.status(503).json({ erreur: 'paiement_indisponible' });
+    }
+  }));
+
   rc.get('/commandes', connecte, (req, res) => {
     res.json(db.prepare('SELECT * FROM commandes WHERE client_id = ? ORDER BY id DESC LIMIT 100').all(req.client.id).map(commandePublique));
   });
@@ -446,6 +540,7 @@ function creerBoutique({ config, db, journal, courriel, paiements, clients, exig
       clients: compte('SELECT count(*) n FROM clients'),
       stl: db.prepare("SELECT count(*) n, coalesce(sum(taille_octets), 0) octets FROM fichiers_stl WHERE chemin != ''").get(),
       paiement_configure: paiements.configure,
+      paiement_mode: paiements.mode,
       courriel: courriel.mode,
     });
   });
@@ -659,7 +754,51 @@ function creerBoutique({ config, db, journal, courriel, paiements, clients, exig
     return bilan;
   }
 
-  return { routesClient: rc, routesAdmin: ra, tacheHoraire, marquerPayee, planifierRappels, enregistrerStl, decoupeur };
+  // ================================================================ webhook Stripe (/api/stripe/webhook)
+
+  async function webhookStripe(req, res) {
+    let ev;
+    try {
+      ev = paiements.lireWebhook(req.body, req.headers['stripe-signature']);
+    } catch (e) {
+      journal('stripe.webhook', { req, resultat: 'refuse', detail: e.detail || e.code });
+      return res.status(400).json({ erreur: e.code });
+    }
+    const o = ev.data?.object || {};
+    const c = q.commande.get(Number(o.metadata?.commande_id || o.client_reference_id) || 0);
+    // un même événement n'est jamais traité deux fois (Stripe peut le renvoyer)
+    const nouveau = db.prepare('INSERT OR IGNORE INTO evenements_stripe (id, commande_id, type, recu_le) VALUES (?, ?, ?, ?)')
+      .run(String(ev.id), c?.id ?? null, String(ev.type), Date.now()).changes;
+    if (!nouveau) return res.json({ recu: true });
+
+    if (['checkout.session.completed', 'checkout.session.async_payment_succeeded'].includes(ev.type) && o.payment_status === 'paid') {
+      // tout doit correspondre à la commande : session, montant, devise
+      if (!c || c.stripe_session_id !== o.id || o.amount_total !== c.total_cts || o.currency !== 'eur') {
+        console.error(`[stripe] paiement ${o.id} ne correspond à aucune commande (commande ${c?.id ?? '?'}, ${o.amount_total} ${o.currency})`);
+        journal('stripe.anomalie', { cible: `session ${o.id}`, resultat: 'erreur', detail: `commande ${c?.id ?? '?'}` });
+        await prevenirAdmins('Paiement Stripe à vérifier', `Un paiement Stripe (session ${o.id}, ${o.amount_total} ${o.currency}) ne correspond `
+          + `à aucune commande en attente (commande ${c?.id ?? 'inconnue'}). Vérifie-le dans le tableau de bord Stripe et rembourse-le si besoin.`);
+        return res.json({ recu: true });
+      }
+      if (marquerPayee(c.id, o.payment_intent)) {
+        const f = emettreFacture(c);
+        const limite = q.commande.get(c.id).validation_limite_le;
+        journal('boutique.paiement', { cible: `commande ${c.id}`, resultat: 'ok', detail: `${c.total_cts} cts, facture ${f.numero}` });
+        await prevenirClient(c, 'Paiement reçu, merci !', `Nous avons bien reçu ton paiement de ${euros(c.total_cts)} (facture ${f.numero}).\n`
+          + 'Nous vérifions ta commande puis l\'imprimons : expédition sous 2 semaines en général, 2 mois au plus. '
+          + 'Tu recevras un e-mail à chaque étape.');
+        await prevenirAdmins(`Nouvelle commande payée n° ${c.id}`, `Commande n° ${c.id} payée : ${euros(c.total_cts)} (facture ${f.numero}).\n`
+          + `À valider avant le ${new Date(limite).toLocaleDateString('fr-FR')}, sinon elle sera remboursée automatiquement.`);
+      }
+    } else if (ev.type === 'checkout.session.expired' && c) {
+      db.prepare("UPDATE commandes SET statut = 'abandonnee' WHERE id = ? AND statut = 'en_attente_paiement' AND stripe_session_id = ?")
+        .run(c.id, o.id);
+    }
+    res.json({ recu: true });
+  }
+
+  return { routesClient: rc, routesAdmin: ra, tacheHoraire, marquerPayee, planifierRappels, enregistrerStl, decoupeur, webhookStripe,
+    emettreFacture };
 }
 
 module.exports = { creerBoutique, prixLivraison, prixMatiere, datesRappels };

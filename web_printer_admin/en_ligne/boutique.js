@@ -33,6 +33,7 @@ async function chargerResume() {
   $('r-clients').textContent = d.clients;
   const alertes = [];
   if (!d.paiement_configure) alertes.push('Stripe n\'est pas encore branché : refus et remboursements automatiques sont en attente.');
+  if (d.paiement_mode === 'test') alertes.push('Stripe est en mode test : les paiements sont fictifs (carte 4242…).');
   if (d.courriel === 'journal') alertes.push('Aucun service d\'e-mail : les e-mails sont seulement écrits dans les logs du serveur.');
   $('r-alertes').hidden = !alertes.length;
   $('r-alertes').textContent = alertes.join(' ');

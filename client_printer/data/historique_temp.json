@@ -1,1636 +1,6 @@
 [
   {
     "temperature": 16,
-    "timestamp": 1795095724.114354,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095724.114354,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095726.3351078,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095726.3351078,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095728.5877938,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095728.5877938,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095730.8583312,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095730.8583312,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095733.1148822,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095733.1148822,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095735.358092,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095735.358092,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095738.1234562,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095738.1234562,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095740.3817554,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095740.3817554,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095743.2089376,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095743.2089376,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095745.3941507,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095745.3941507,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095748.1659565,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095748.1659565,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095750.4103792,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095750.4103792,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095752.942482,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095752.942482,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095755.1887548,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095755.1887548,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095757.459454,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095757.459454,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095759.9336786,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095759.9336786,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095762.6947627,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095762.6947627,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095764.958766,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095764.958766,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095767.4867206,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095767.4867206,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095769.7216077,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095769.7216077,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095771.9728148,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095771.9728148,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095774.2644334,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095774.2644334,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095776.984566,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095776.984566,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095779.2872908,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095779.2872908,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095782.0006018,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095782.0006018,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095784.3278208,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095784.3278208,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095786.5303693,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095786.5303693,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095789.3102663,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095789.3102663,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095791.5301535,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095791.5301535,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095794.0446167,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095794.0446167,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095796.3542519,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095796.3542519,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095798.8000789,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095798.8000789,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095801.3544047,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095801.3544047,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095804.0634825,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095804.0634825,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095806.3585122,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095806.3585122,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095809.1977823,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095809.1977823,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095812.0947986,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095812.0947986,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095814.3779218,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095814.3779218,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095817.1004772,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095817.1004772,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095819.3961973,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095819.3961973,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095821.873116,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095821.873116,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095824.620798,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095824.620798,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095826.8787491,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095826.8787491,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095829.1334891,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095829.1334891,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095831.433367,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095831.433367,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095833.9074962,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095833.9074962,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095836.1658113,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095836.1658113,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095838.4441342,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095838.4441342,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095840.6701462,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095840.6701462,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095842.9283082,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095842.9283082,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095845.2013521,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095845.2013521,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095847.4605513,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095847.4605513,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095849.954519,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095849.954519,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095852.7109075,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095852.7109075,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095854.9794946,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095854.9794946,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095857.7372475,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095857.7372475,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095859.9872296,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095859.9872296,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095862.2409794,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095862.2409794,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095864.5186746,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095864.5186746,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095866.7551656,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095866.7551656,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095869.012872,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095869.012872,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095871.271569,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095871.271569,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095874.0217288,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095874.0217288,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095876.2862134,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095876.2862134,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095878.6550283,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095878.6550283,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095880.8000827,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095880.8000827,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095883.3016496,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095883.3016496,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095886.3145325,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095886.3145325,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095888.591111,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095888.591111,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095891.0731802,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095891.0731802,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095893.3316486,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095893.3316486,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095895.6154492,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095895.6154492,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095898.1259637,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095898.1259637,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095900.8566592,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095900.8566592,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095903.3514082,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095903.3514082,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095905.6590292,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095905.6590292,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095908.1298068,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095908.1298068,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095910.8896956,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095910.8896956,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095913.172613,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095913.172613,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095915.4054508,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095915.4054508,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095918.16204,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095918.16204,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095920.4125068,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095920.4125068,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095923.1765382,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095923.1765382,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095925.42888,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095925.42888,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095927.719623,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095927.719623,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095929.9450686,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095929.9450686,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095932.2013688,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095932.2013688,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095934.5025597,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095934.5025597,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095937.21372,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095937.21372,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095939.5022984,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095939.5022984,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095942.2338774,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095942.2338774,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095944.5187867,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095944.5187867,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095946.9994454,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095946.9994454,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095949.2693427,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095949.2693427,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095951.5129788,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095951.5129788,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095953.7651167,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095953.7651167,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095956.0201948,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095956.0201948,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095958.2795947,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095958.2795947,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095961.038383,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095961.038383,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095963.314683,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095963.314683,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095965.5532846,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095965.5532846,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095967.8541656,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095967.8541656,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095970.8614476,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095970.8614476,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095973.0785706,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095973.0785706,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095975.3313115,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095975.3313115,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095977.590577,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095977.590577,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095980.3448796,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095980.3448796,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095982.603893,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095982.603893,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095984.8626041,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095984.8626041,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095987.1297152,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095987.1297152,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095989.3878272,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095989.3878272,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095991.6342669,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095991.6342669,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095993.8949149,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095993.8949149,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095996.9151936,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095996.9151936,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795095999.1641407,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795095999.1641407,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096001.6613095,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096001.6613095,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096003.9253807,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096003.9253807,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096006.188214,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096006.188214,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096008.9406285,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096008.9406285,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096011.1909454,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096011.1909454,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096013.6985009,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096013.6985009,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096015.9620824,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096015.9620824,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096018.5057108,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096018.5057108,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096020.7253096,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096020.7253096,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096023.2271864,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096023.2271864,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096025.5297382,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096025.5297382,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096028.0019984,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096028.0019984,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096030.248942,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096030.248942,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096032.5148778,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096032.5148778,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096034.7916472,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096034.7916472,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096037.5214603,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096037.5214603,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096039.807629,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096039.807629,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096042.0859907,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096042.0859907,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096044.296633,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096044.296633,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096046.8025954,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096046.8025954,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096049.1010711,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096049.1010711,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096051.8202477,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096051.8202477,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096054.0750048,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096054.0750048,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096056.8312187,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096056.8312187,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096059.1213653,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096059.1213653,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096061.5914137,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096061.5914137,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096063.8521345,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096063.8521345,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096066.360033,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096066.360033,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096068.617337,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096068.617337,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096070.8735886,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096070.8735886,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096073.3768766,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096073.3768766,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096075.63224,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096075.63224,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096078.170469,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096078.170469,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096080.404088,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096080.404088,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096083.1588778,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096083.1588778,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096085.439529,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096085.439529,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096087.6650424,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096087.6650424,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096090.452539,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096090.452539,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096092.6848707,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096092.6848707,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096095.6939712,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096095.6939712,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096097.975004,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096097.975004,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096100.206911,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096100.206911,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096102.9699059,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096102.9699059,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096105.243079,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096105.243079,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096107.7357905,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096107.7357905,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096110.551129,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096110.551129,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096112.7456586,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096112.7456586,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
-    "timestamp": 1795096115.0026364,
-    "capteur": "nozzle"
-  },
-  {
-    "temperature": 15,
-    "timestamp": 1795096115.0026364,
-    "capteur": "bed"
-  },
-  {
-    "temperature": 16,
     "timestamp": 1795096117.258699,
     "capteur": "nozzle"
   },
@@ -2497,6 +867,1636 @@
   {
     "temperature": 15,
     "timestamp": 1795096324.6683664,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115635.8669395,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115635.8669395,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115640.264617,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115640.264617,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115678.5791485,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115678.5791485,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115681.9985058,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115681.9985058,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115684.2984655,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115684.2984655,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115687.080561,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115687.080561,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115689.4329982,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115689.4329982,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115691.5795212,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115691.5795212,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115693.8132982,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115693.8132982,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115696.3272593,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115696.3272593,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115698.7541258,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115698.7541258,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115700.8441615,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115700.8441615,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115703.505887,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115703.505887,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115705.6040263,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115705.6040263,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115708.1201308,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115708.1201308,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115710.6219978,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115710.6219978,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115712.8825831,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115712.8825831,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115715.145328,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115715.145328,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115717.6548965,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115717.6548965,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115738.2659757,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115738.2659757,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115757.8283644,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115757.8283644,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115760.0125294,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115760.0125294,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115762.3259077,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115762.3259077,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115765.2884316,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115765.2884316,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115767.5959613,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115767.5959613,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115774.2662876,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115774.2662876,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115786.1564658,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115786.1564658,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115788.3485866,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115788.3485866,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115790.66885,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115790.66885,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115848.5799122,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115848.5799122,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115851.3264396,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115851.3264396,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115853.592059,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115853.592059,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115856.3453064,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115856.3453064,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115859.5420125,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115859.5420125,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115862.8469834,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115862.8469834,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115868.0777657,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115868.0777657,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115870.3851612,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115870.3851612,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115872.6166444,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115872.6166444,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115875.370244,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115875.370244,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115877.9606414,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115877.9606414,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115880.1755054,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115880.1755054,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115882.86571,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115882.86571,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115885.4529371,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115885.4529371,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115888.0457895,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115888.0457895,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115892.5746062,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115892.5746062,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115896.0948737,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115896.0948737,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115898.6499915,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115898.6499915,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115901.1620615,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115901.1620615,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115903.4864454,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115903.4864454,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115905.7214952,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115905.7214952,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115908.0302198,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115908.0302198,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115910.4932265,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115910.4932265,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115914.246524,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115914.246524,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115917.5697577,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115917.5697577,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115919.9311824,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115919.9311824,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115922.025511,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115922.025511,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115924.863265,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115924.863265,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115928.01385,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115928.01385,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115932.0177646,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115932.0177646,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115937.1020615,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115937.1020615,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115939.7705927,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115939.7705927,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115941.838247,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115941.838247,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115944.0916045,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115944.0916045,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115948.7562172,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115948.7562172,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115953.9746606,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115953.9746606,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115956.3145914,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115956.3145914,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115961.2967923,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115961.2967923,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115963.502762,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115963.502762,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115966.4400346,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115966.4400346,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115969.961832,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115969.961832,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115973.626273,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115973.626273,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115976.9142938,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115976.9142938,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115980.1116307,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115980.1116307,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115983.9217262,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115983.9217262,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115986.2367382,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115986.2367382,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115988.496726,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115988.496726,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115990.7565289,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115990.7565289,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115993.0029848,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115993.0029848,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115995.2673988,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115995.2673988,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795115997.576279,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795115997.576279,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116019.1975436,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116019.1975436,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116030.9324262,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116030.9324262,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116036.0408897,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116036.0408897,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116038.8006995,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116038.8006995,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116040.931222,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116040.931222,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116047.0470796,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116047.0470796,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116051.3046248,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116051.3046248,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116053.4595885,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116053.4595885,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116055.9541295,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116055.9541295,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116058.562949,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116058.562949,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116061.750798,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116061.750798,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116064.975973,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116064.975973,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116069.4933171,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116069.4933171,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116072.7836435,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116072.7836435,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116075.0643141,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116075.0643141,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116077.26843,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116077.26843,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116079.564291,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116079.564291,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116082.2295995,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116082.2295995,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116084.6038663,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116084.6038663,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116086.8811204,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116086.8811204,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116089.2624996,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116089.2624996,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116091.6923354,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116091.6923354,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116093.8283935,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116093.8283935,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116096.2242734,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116096.2242734,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116098.39947,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116098.39947,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116100.8525898,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116100.8525898,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116103.2219677,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116103.2219677,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116105.3825264,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116105.3825264,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116107.7072482,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116107.7072482,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116109.908225,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116109.908225,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116112.2865558,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116112.2865558,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116114.5819125,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116114.5819125,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116116.6837354,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116116.6837354,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116118.963031,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116118.963031,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116121.2048376,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116121.2048376,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116123.5119622,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116123.5119622,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116125.8218493,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116125.8218493,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116128.032068,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116128.032068,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116130.3715067,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116130.3715067,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116132.6983511,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116132.6983511,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116134.9658322,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116134.9658322,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116137.3116493,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116137.3116493,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 16,
+    "timestamp": 1795116139.9705493,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 15,
+    "timestamp": 1795116139.9705493,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 14,
+    "timestamp": 1795192902.3010616,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 13,
+    "timestamp": 1795192902.3010616,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 14,
+    "timestamp": 1795192904.5511954,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 13,
+    "timestamp": 1795192904.5511954,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 14,
+    "timestamp": 1795192906.8060362,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 13,
+    "timestamp": 1795192906.8060362,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 14,
+    "timestamp": 1795192909.0613127,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 13,
+    "timestamp": 1795192909.0613127,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 13,
+    "timestamp": 1795192911.327002,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 13,
+    "timestamp": 1795192911.327002,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 13,
+    "timestamp": 1795192913.6142592,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 13,
+    "timestamp": 1795192913.6142592,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 14,
+    "timestamp": 1795192915.8374774,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 13,
+    "timestamp": 1795192915.8374774,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 14,
+    "timestamp": 1795192918.0851328,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 13,
+    "timestamp": 1795192918.0851328,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 14,
+    "timestamp": 1795192920.3447683,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 13,
+    "timestamp": 1795192920.3447683,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 14,
+    "timestamp": 1795192922.6036851,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 13,
+    "timestamp": 1795192922.6036851,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 14,
+    "timestamp": 1795192924.8611882,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 13,
+    "timestamp": 1795192924.8611882,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 13,
+    "timestamp": 1795192927.1451485,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 13,
+    "timestamp": 1795192927.1451485,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 14,
+    "timestamp": 1795192929.374717,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 13,
+    "timestamp": 1795192929.374717,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 14,
+    "timestamp": 1795192931.656186,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 13,
+    "timestamp": 1795192931.656186,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 14,
+    "timestamp": 1795192933.8862548,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 13,
+    "timestamp": 1795192933.8862548,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 13,
+    "timestamp": 1795192936.1681955,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 13,
+    "timestamp": 1795192936.1681955,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 14,
+    "timestamp": 1795192938.398759,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 13,
+    "timestamp": 1795192938.398759,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 14,
+    "timestamp": 1795192940.6701717,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 13,
+    "timestamp": 1795192940.6701717,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 13,
+    "timestamp": 1795192942.9326355,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 13,
+    "timestamp": 1795192942.9326355,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 14,
+    "timestamp": 1795192945.1687536,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 13,
+    "timestamp": 1795192945.1687536,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 14,
+    "timestamp": 1795192947.4346423,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 13,
+    "timestamp": 1795192947.4346423,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 14,
+    "timestamp": 1795192949.6887693,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 13,
+    "timestamp": 1795192949.6887693,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 14,
+    "timestamp": 1795192951.9406393,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 13,
+    "timestamp": 1795192951.9406393,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 14,
+    "timestamp": 1795192954.1940653,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 13,
+    "timestamp": 1795192954.1940653,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 14,
+    "timestamp": 1795192956.452645,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 13,
+    "timestamp": 1795192956.452645,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 14,
+    "timestamp": 1795192958.715007,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 13,
+    "timestamp": 1795192958.715007,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 14,
+    "timestamp": 1795192961.0393884,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 13,
+    "timestamp": 1795192961.0393884,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 14,
+    "timestamp": 1795192963.2776713,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 13,
+    "timestamp": 1795192963.2776713,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 14,
+    "timestamp": 1795192965.47794,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 13,
+    "timestamp": 1795192965.47794,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 14,
+    "timestamp": 1795192967.7581813,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 13,
+    "timestamp": 1795192967.7581813,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 14,
+    "timestamp": 1795192970.023883,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 12,
+    "timestamp": 1795192970.023883,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 14,
+    "timestamp": 1795192972.2485769,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 12,
+    "timestamp": 1795192972.2485769,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 14,
+    "timestamp": 1795192974.50655,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 12,
+    "timestamp": 1795192974.50655,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 14,
+    "timestamp": 1795192976.7872005,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 12,
+    "timestamp": 1795192976.7872005,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 14,
+    "timestamp": 1795192979.0588555,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 12,
+    "timestamp": 1795192979.0588555,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 14,
+    "timestamp": 1795192981.2783983,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 12,
+    "timestamp": 1795192981.2783983,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 14,
+    "timestamp": 1795192983.5346725,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 12,
+    "timestamp": 1795192983.5346725,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 14,
+    "timestamp": 1795192985.818945,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 12,
+    "timestamp": 1795192985.818945,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 14,
+    "timestamp": 1795192988.044717,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 12,
+    "timestamp": 1795192988.044717,
+    "capteur": "bed"
+  },
+  {
+    "temperature": 14,
+    "timestamp": 1795192990.3017356,
+    "capteur": "nozzle"
+  },
+  {
+    "temperature": 12,
+    "timestamp": 1795192990.3017356,
     "capteur": "bed"
   }
 ]

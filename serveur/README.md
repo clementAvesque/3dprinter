@@ -101,6 +101,24 @@ téléchargement dans la fiche d'une commande payée) et n'a plus accès aux STL
 - Orca a besoin de mémoire : machine Fly de 1 Go au moins (`fly scale memory 1024`).
 - En local, sans Orca : les devis restent « en file ». `ORCA_CMD` indique la commande à lancer.
 
+### Paiement (Stripe)
+
+Le client commande un devis découpé : adresse de livraison, puis paiement sur la page sécurisée de Stripe
+(Checkout). Le montant vient toujours du devis calculé par le serveur. Stripe confirme le paiement par un webhook
+signé (`/api/stripe/webhook`) : la commande passe « payée », une facture numérotée est créée (`2026-000001`...),
+le client et l'admin reçoivent un e-mail, et l'admin peut voir et télécharger le gcode. Refuser une commande la
+rembourse intégralement par Stripe.
+
+1. Compte Stripe (stripe.com), en **mode test** d'abord.
+2. Depuis la racine du projet : `python serveur/scripts/stripe_configurer.py`. Il demande la clé secrète
+   (Developers > API keys > Secret key, `sk_test_...`, masquée), crée le webhook chez Stripe et envoie
+   `STRIPE_CLE_SECRETE` et `STRIPE_SECRET_WEBHOOK` à Fly (le serveur redémarre).
+3. Essai : commande un devis et paie avec la carte `4242 4242 4242 4242`, une date future, CVC `123`.
+4. Passage en réel (après les pages légales) : relancer le script avec la clé `sk_live_...` du mode réel.
+
+Sans ces secrets, « Commander » répond que le paiement n'est pas encore ouvert. Le reçu de paiement est envoyé
+par Stripe ; une facture PDF à ton nom viendra avec les mentions légales.
+
 ### E-mails des clients (Brevo)
 
 Sans réglage, les e-mails (confirmation d'inscription, mot de passe oublié, suivi des commandes) sont seulement

@@ -40,7 +40,9 @@ const DEFAUT = {
   siteClient: '../web_printer_user/front/dist',
   // découpe des devis par OrcaSlicer : commande à lancer (vide = pas de découpe, les devis restent « attente »).
   // Dans l'image Docker : ORCA_CMD="xvfb-run -a /opt/orca/AppRun" (voir Dockerfile)
-  orca: { commande: '', profils: 'orca', delaiMs: 15 * 60e3, intervalleMs: 10e3 },
+  orca: { commande: '', profils: 'orca', delaiMs: 40 * 60e3, intervalleMs: 10e3 },   // CPU partagé de Fly : gros plateaux lents
+  // paiement : clés dans les secrets Fly (scripts/stripe_configurer.py) ; vides = paiement désactivé
+  stripe: { cleSecrete: '', secretWebhook: '', api: 'https://api.stripe.com', version: '2024-06-20' },
   uploadMaxOctets: 200 * 1024 * 1024,
   // boutique (site client) : voir web_printer_user/CONCEPTION.md
   boutique: {
@@ -56,7 +58,7 @@ const DEFAUT = {
     validationJours: 10,              // sans validation : remboursement automatique
     envoiJours: 60,                   // après validation : limite d'envoi
     objectifEnvoiJours: 14,
-    stlMaxOctets: 50 * 1024 * 1024,
+    stlMaxOctets: 200 * 1024 * 1024,      // pièces très arrondies : STL lourds (gardé en mémoire le temps de le vérifier)
     stlConservationJours: 30,         // STL jamais commandé
     stlCommandeConservationJours: 730, // STL d'une commande payée : 2 ans
     session: { dureeMaxMs: 30 * 864e5, inactiviteMs: 7 * 864e5 },
@@ -101,6 +103,9 @@ function depuisEnv(c, env = process.env) {
   poser(c, 'donnees', env.DONNEES);
   poser(c, 'siteClient', env.SITE_CLIENT);
   poser(c.orca, 'commande', env.ORCA_CMD);
+  poser(c.stripe, 'cleSecrete', env.STRIPE_CLE_SECRETE);        // secrets : fly secrets, jamais dans fly.toml
+  poser(c.stripe, 'secretWebhook', env.STRIPE_SECRET_WEBHOOK);
+  poser(c.stripe, 'api', env.STRIPE_API);                        // tests : faux Stripe local
   poser(c.boutique, 'urlSite', env.URL_SITE);
   poser(c.boutique.courriel, 'mode', env.COURRIEL_MODE);
   poser(c.boutique.courriel, 'expediteur', env.COURRIEL_EXPEDITEUR);

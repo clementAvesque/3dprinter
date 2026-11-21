@@ -95,7 +95,7 @@ function apresConnexion() {
            @click="champ.click()" @keydown.enter.prevent="champ.click()">
         <input ref="champ" type="file" accept=".stl" multiple hidden @change="choisir">
         <b>Glisse tes fichiers STL ici</b>
-        <span>ou clique pour les choisir · plusieurs fichiers possibles · 50 Mo max chacun</span>
+        <span>ou clique pour les choisir · plusieurs fichiers possibles · 200 Mo max chacun</span>
       </div>
 
       <ul v-if="atelier.erreurs.length" class="erreurs">
