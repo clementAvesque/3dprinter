@@ -347,4 +347,9 @@ dialog.fiche { width: min(1100px, calc(100vw - 32px)); max-width: none; max-heig
 .liste-pieces { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .liste-pieces li { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .liste-pieces button { text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+/* commande groupée : un bloc par devis (titre + pièces) */
+.liste-pieces li.devis-commande { flex-direction: column; align-items: stretch; padding: 8px 0; border-top: 1px solid var(--border); }
+.liste-pieces li.devis-commande:first-child { border-top: 0; }
+.liste-pieces li.devis-commande ul { margin: 4px 0 0; padding-left: 18px; }
+.liste-pieces li.devis-commande li { display: list-item; }
 dialog select, dialog input:not(.code) { width: 100%; }

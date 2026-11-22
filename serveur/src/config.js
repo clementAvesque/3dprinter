@@ -58,7 +58,7 @@ const DEFAUT = {
     validationJours: 10,              // sans validation : remboursement automatique
     envoiJours: 60,                   // après validation : limite d'envoi
     objectifEnvoiJours: 14,
-    stlMaxOctets: 200 * 1024 * 1024,      // pièces très arrondies : STL lourds (gardé en mémoire le temps de le vérifier)
+    stlMaxOctets: 100 * 1024 * 1024,      // pièces très arrondies : STL lourds (gardé en mémoire le temps de le vérifier)
     stlConservationJours: 30,         // STL jamais commandé
     stlCommandeConservationJours: 730, // STL d'une commande payée : 2 ans
     session: { dureeMaxMs: 30 * 864e5, inactiviteMs: 7 * 864e5 },

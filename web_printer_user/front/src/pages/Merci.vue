@@ -36,7 +36,7 @@ onBeforeUnmount(() => clearTimeout(minuteur));
     <template v-else-if="commande && commande.statut !== 'en_attente_paiement'">
       <div class="carte">
         <h1>Merci !</h1>
-        <p>Ton paiement de <b>{{ euros(commande.total_cts) }}</b> est bien reçu : commande n° {{ commande.id }}.</p>
+        <p>Ton paiement de <b>{{ euros(commande.total_cts) }}</b> est bien reçu : commande {{ commande.ref }}.</p>
         <p class="discret">Un e-mail de confirmation t'a été envoyé. Nous vérifions ta commande puis l'imprimons :
           expédition sous 2 semaines en général, 2 mois au plus. Tu seras prévenu à chaque étape.</p>
       </div>
@@ -45,7 +45,7 @@ onBeforeUnmount(() => clearTimeout(minuteur));
     <template v-else-if="commande">
       <div class="carte">
         <h1>Paiement pas encore confirmé</h1>
-        <p class="discret">Stripe ne nous a pas encore confirmé le paiement de la commande n° {{ commande.id }}. Si tu as bien payé,
+        <p class="discret">Stripe ne nous a pas encore confirmé le paiement de la commande {{ commande.ref }}. Si tu as bien payé,
           la confirmation arrivera par e-mail d'ici quelques minutes. Sinon, tu peux réessayer depuis ton devis.</p>
       </div>
       <RouterLink :to="`/devis/${commande.devis_id}`" class="lien">Retour au devis</RouterLink>

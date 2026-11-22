@@ -151,6 +151,19 @@ function schemaBoutique(db) {
     CREATE INDEX IF NOT EXISTS commandes_client ON commandes(client_id);
     CREATE INDEX IF NOT EXISTS commandes_statut ON commandes(statut);
 
+    -- devis d'une commande (commande groupée : plusieurs devis payés ensemble, une seule livraison).
+    -- commandes.devis_id garde le premier devis ; un devis n'appartient qu'à une commande.
+    CREATE TABLE IF NOT EXISTS commande_devis (
+      commande_id  INTEGER NOT NULL REFERENCES commandes(id) ON DELETE CASCADE,
+      devis_id     INTEGER NOT NULL UNIQUE REFERENCES devis(id),
+      PRIMARY KEY (commande_id, devis_id)
+    );
+    CREATE TRIGGER IF NOT EXISTS commande_devis_premier AFTER INSERT ON commandes BEGIN
+      INSERT OR IGNORE INTO commande_devis (commande_id, devis_id) VALUES (NEW.id, NEW.devis_id);
+    END;
+    -- commandes d'avant les commandes groupées
+    INSERT OR IGNORE INTO commande_devis (commande_id, devis_id) SELECT id, devis_id FROM commandes;
+
     CREATE TABLE IF NOT EXISTS factures (
       id           INTEGER PRIMARY KEY,
       commande_id  INTEGER NOT NULL UNIQUE REFERENCES commandes(id),
@@ -217,6 +230,23 @@ function schemaBoutique(db) {
     }
   };
   ajouterColonne('devis', 'decoupe_debut_le', 'INTEGER');     // début de la découpe : barre de progression du client
+  ajouterColonne('devis_pieces', 'echelle', 'REAL NOT NULL DEFAULT 1');   // multiplicateur de taille (STL en mètres...)
+
+  // identifiant public (UUID v4) de ce que voit le client : les numéros internes (1, 2, 3...) ne sortent jamais
+  // du serveur, personne ne peut deviner combien de devis ou de commandes existent ni lire ceux des autres.
+  // Rempli par un déclencheur à chaque insertion (quel que soit le code qui insère), et pour les lignes existantes.
+  const UUID_SQL = `lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' || substr(lower(hex(randomblob(2))), 2)
+    || '-' || substr('89ab', 1 + (abs(random()) % 4), 1) || substr(lower(hex(randomblob(2))), 2) || '-' || lower(hex(randomblob(6)))`;
+  for (const table of ['devis', 'commandes', 'fichiers_stl', 'adresses']) {
+    ajouterColonne(table, 'uuid', 'TEXT');
+    db.exec(`
+      CREATE UNIQUE INDEX IF NOT EXISTS ${table}_uuid ON ${table}(uuid);
+      CREATE TRIGGER IF NOT EXISTS ${table}_uuid_auto AFTER INSERT ON ${table} WHEN NEW.uuid IS NULL BEGIN
+        UPDATE ${table} SET uuid = ${UUID_SQL} WHERE id = NEW.id;
+      END;
+      UPDATE ${table} SET uuid = ${UUID_SQL} WHERE uuid IS NULL;
+    `);
+  }
 
   const inserer = db.prepare(`INSERT OR IGNORE INTO imprimantes
     (id, nom, plateau_x_mm, plateau_y_mm, plateau_z_mm, buse_mm, profil_orca, disponible) VALUES (?, ?, ?, ?, ?, ?, ?, 1)`);

@@ -60,7 +60,7 @@ function creerPaiements(config, { fetch: fetchFn = globalThis.fetch } = {}) {
     mode,
 
     // page de paiement Stripe pour une commande ; retourne { id, url }
-    async creerSession({ commande, email, devisId, urlSite }) {
+    async creerSession({ commande, email, devis, urlSite }) {
       const s = await appeler('/v1/checkout/sessions', {
         mode: 'payment',
         locale: 'fr',
@@ -68,14 +68,16 @@ function creerPaiements(config, { fetch: fetchFn = globalThis.fetch } = {}) {
         client_reference_id: String(commande.id),
         metadata: { commande_id: String(commande.id) },
         payment_intent_data: { metadata: { commande_id: String(commande.id) }, receipt_email: email },
+        // une ligne par devis (commande groupée) + une seule livraison
         line_items: [
-          { quantity: 1, price_data: { currency: 'eur', unit_amount: commande.sous_total_cts,
-            product_data: { name: `Impression 3D · devis n° ${devisId}`, description: 'Pièces imprimées en PLA (poids calculé par OrcaSlicer)' } } },
+          ...devis.map((d) => ({ quantity: 1, price_data: { currency: 'eur', unit_amount: d.prix_matiere_cts,
+            product_data: { name: `Impression 3D · devis ${d.uuid.slice(0, 8).toUpperCase()}`, description: `${d.poids_g} g de PLA (poids calculé par OrcaSlicer)` } } })),
           { quantity: 1, price_data: { currency: 'eur', unit_amount: commande.livraison_cts,
-            product_data: { name: 'Livraison' } } },
+            product_data: { name: devis.length > 1 ? `Livraison groupée (${devis.length} devis)` : 'Livraison' } } },
         ],
-        success_url: `${urlSite}/merci?commande=${commande.id}`,
-        cancel_url: `${urlSite}/devis/${devisId}`,
+        // adresses publiques (UUID) : le numéro interne de la commande ne sort pas du serveur
+        success_url: `${urlSite}/merci?commande=${commande.uuid}`,
+        cancel_url: devis.length > 1 ? `${urlSite}/compte` : `${urlSite}/devis/${devis[0].uuid}`,
         expires_at: Math.floor(Date.now() / 1000) + 60 * 60,      // 1 h pour payer
       }, `session-commande-${commande.id}-${commande.cree_le}`);
       return { id: s.id, url: s.url };

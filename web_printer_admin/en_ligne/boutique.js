@@ -90,7 +90,7 @@ async function ouvrirCommande(id) {
   const c = r.json;
   ouverte = c;
   const [txt] = STATUTS[c.statut] || [c.statut];
-  $('c-titre').textContent = `Commande n° ${c.id}`;
+  $('c-titre').textContent = `Commande n° ${c.id}${c.ref ? ` · réf. client ${c.ref}` : ''}`;
   $('c-statut').textContent = txt;
   $('c-total').textContent = euros(c.total_cts);
   $('c-paye').textContent = date(c.paye_le);
@@ -101,23 +101,51 @@ async function ouvrirCommande(id) {
   $('c-adresse').textContent = [c.livraison_nom, a.ligne1, a.ligne2, `${a.code_postal || ''} ${a.ville || ''}`.trim(), a.pays].filter(Boolean).join(', ');
   const rg = c.devis.reglages;
   $('c-reglages').textContent = `Remplissage ${rg.remplissage_pct} % · ${rg.couches_surface} couches de surface · ${PROPRETES[rg.proprete]}`;
+  // un bloc par devis (commande groupée : plusieurs devis = plusieurs plateaux, une seule livraison)
+  const liste = c.devis_liste?.length ? c.devis_liste : [c.devis];
+  const payee = !['en_attente_paiement', 'abandonnee'].includes(c.statut);
   const ul = $('c-pieces');
   ul.innerHTML = '';
-  for (const p of c.devis.pieces) {
+  for (const d of liste) {
     const li = document.createElement('li');
-    li.textContent = `${p.nom} × ${p.quantite} · ${mm(p.dims_mm[0])} × ${mm(p.dims_mm[1])} × ${mm(p.dims_mm[2])} mm`;
+    li.className = 'devis-commande';
+    const titre = document.createElement('div');
+    titre.className = 'row';
+    const b = document.createElement('button');
+    b.className = 'fantome';
+    b.textContent = `Devis n° ${d.id}${d.ref ? ` · ${d.ref}` : ''}`;
+    b.title = 'voir son gcode en 3D';
+    b.disabled = !payee || d.statut !== 'pret';
+    b.onclick = () => voirGcode(c, d.id);
+    const infos = document.createElement('span');
+    infos.className = 'muted small';
+    infos.textContent = d.poids_g == null ? '' : `${mm(d.poids_g)} g · ${d.nb_couches} couches · ${duree(d.duree_s)}`;
+    titre.append(b, infos);
+    if (payee && d.statut === 'pret') {
+      const tel = document.createElement('a');
+      tel.className = 'lien small';
+      tel.textContent = 'télécharger le gcode';
+      tel.href = `${API}/boutique/commandes/${c.id}/devis/${d.id}/gcode`;
+      titre.append(tel);
+    }
+    const pieces = document.createElement('ul');
+    pieces.className = 'small muted';
+    for (const p of d.pieces) {
+      const lp = document.createElement('li');
+      lp.textContent = `${p.nom} × ${p.quantite} · ${mm(p.dims_mm[0])} × ${mm(p.dims_mm[1])} × ${mm(p.dims_mm[2])} mm`
+        + (p.echelle && p.echelle !== 1 ? ` (taille ×${String(p.echelle).replace('.', ',')})` : '');
+      pieces.appendChild(lp);
+    }
+    li.append(titre, pieces);
     ul.appendChild(li);
   }
-  const d = c.devis;
-  $('c-decoupe').textContent = d.poids_g == null ? '' : `${mm(d.poids_g)} g · ${d.nb_couches} couches · ${duree(d.duree_s)}`;
-  const tel = $('c-gcode');
-  tel.hidden = ['en_attente_paiement', 'abandonnee'].includes(c.statut) || d.statut !== 'pret';
-  tel.href = `${API}/boutique/commandes/${c.id}/gcode`;
+  $('c-decoupe').textContent = liste.length > 1 ? `Commande groupée : ${liste.length} devis, ${liste.length} plateaux, une seule livraison.` : '';
+  $('c-gcode').hidden = true;      // un lien par devis, dans la liste
   $('c-motif').hidden = !c.motif_refus;
   $('c-motif').textContent = c.motif_refus ? `Motif : ${c.motif_refus}` : '';
   actions(c);
   $('fiche').showModal();
-  voirGcode(c);
+  voirGcode(c, liste[0].id);
 }
 
 function actions(c) {
@@ -178,7 +206,7 @@ const duree = (sec) => {
 };
 
 let vue = null;
-async function voirGcode(c) {
+async function voirGcode(c, devisId) {
   const msg = $('c-message');
   msg.hidden = false;
   if (['en_attente_paiement', 'abandonnee'].includes(c.statut)) {
@@ -186,10 +214,10 @@ async function voirGcode(c) {
     msg.textContent = 'Pas encore payée : le gcode sera disponible après le paiement.';
     return;
   }
-  msg.textContent = 'Chargement de l\'aperçu du gcode…';
+  msg.textContent = `Chargement de l'aperçu du gcode (devis n° ${devisId})…`;
   try {
-    vue ||= new Apercu3D($('c-vue'), () => `${API}/boutique/commandes/${ouverte.id}/gcode`);
-    await vue.charger('gcode');
+    vue ||= new Apercu3D($('c-vue'), (nom) => `${API}/boutique/commandes/${ouverte.id}/devis/${nom}/gcode`);
+    await vue.charger(String(devisId));
     msg.hidden = true;
   } catch (e) {
     msg.textContent = `Aperçu impossible : ${e.message}`;

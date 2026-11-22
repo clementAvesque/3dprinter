@@ -68,8 +68,11 @@ async function devisDecoupe(c, id) {
   }
   throw new Error(`devis ${id} jamais découpé`);
 }
-const gcodeDuDevis = (id) => {
-  const d = srv.db.prepare('SELECT gcode_chemin FROM devis WHERE id = ?').get(id);
+// l'API ne donne que des UUID : numéro interne d'une ligne, pour vérifier en base
+const interne = (table, uuid) => srv.db.prepare(`SELECT id FROM ${table} WHERE uuid = ?`).get(uuid)?.id;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const gcodeDuDevis = (id) => {           // UUID (API) ou numéro interne
+  const d = srv.db.prepare('SELECT gcode_chemin FROM devis WHERE uuid = ? OR id = ?').get(String(id), Number(id) || -1);
   return zlib.gunzipSync(fs.readFileSync(path.join(srv.config.donnees, d.gcode_chemin))).toString();
 };
 
@@ -271,7 +274,8 @@ test('STL : envoi, lecture par son propriétaire seulement, refus du reste', asy
   assert.equal(r.statut, 201, JSON.stringify(r.json));
   assert.deepEqual(r.json.dims_mm, [20, 20, 20]);
   fichierId = r.json.id;
-  const f = srv.db.prepare('SELECT * FROM fichiers_stl WHERE id = ?').get(fichierId);
+  assert.match(fichierId, UUID, 'identifiant public : un UUID, pas un numéro');
+  const f = srv.db.prepare('SELECT * FROM fichiers_stl WHERE uuid = ?').get(fichierId);
   assert.ok(f.expire_le - f.cree_le === 30 * JOUR, 'gardé 30 jours tant qu\'il n\'est pas commandé');
   assert.ok(fs.statSync(path.join(srv.config.donnees, f.chemin)).size < cube(20).length + 50, 'stocké compressé');
   const lu = await alice.req('GET', `/fichiers/${fichierId}`);
@@ -340,7 +344,10 @@ test('découpe : le serveur découpe le devis -> poids, prix, aperçu réservé 
   const cmd = await carol.req('POST', '/commandes', { devis_id: d.id, adresse_id: adr.json.id });
   assert.equal(cmd.statut, 503);
   assert.equal(cmd.json.erreur, 'paiement_non_configure');
-  assert.equal(srv.db.prepare('SELECT count(*) n FROM commandes WHERE devis_id = ?').get(d.id).n, 0);
+  assert.equal(srv.db.prepare('SELECT count(*) n FROM commandes WHERE devis_id = ?').get(interne('devis', d.id)).n, 0);
+  assert.match(d.id, UUID);
+  assert.equal(d.ref, d.id.slice(0, 8).toUpperCase(), 'référence courte affichée au client');
+  assert.equal((await carol.req('GET', `/devis/${interne('devis', d.id)}`)).statut, 404, 'le numéro interne ne marche pas côté client');
 
   // « rapide » : 0,28 mm (la Kobra 3 0.4 n'accepte pas 0,4 mm), sans lissage
   const rapide = await devisDecoupe(carol, (await creer({ proprete: 'rapide' }, 1)).json.id);
@@ -374,12 +381,39 @@ test('découpe : le serveur découpe le devis -> poids, prix, aperçu réservé 
 
   // progression : pendant la découpe (temps écoulé + estimation), dans la file (devis devant)
   srv.db.prepare('UPDATE devis SET decoupe_debut_le = ? WHERE id = ?').run(Date.now() - 5000, ids[0]);
-  const p = (await carol.req('GET', `/devis/${ids[0]}`)).json.progression;
+  const uuid0 = srv.db.prepare('SELECT uuid FROM devis WHERE id = ?').get(ids[0]).uuid;
+  const p = (await carol.req('GET', `/devis/${uuid0}`)).json.progression;
   assert.ok(p.depuis_s >= 4 && p.depuis_s <= 7, JSON.stringify(p));
   assert.ok(p.estimee_s >= 15);
-  assert.equal((await carol.req('DELETE', `/devis/${ids[0]}`)).json.erreur, 'decoupe_en_cours');
+  assert.equal((await carol.req('DELETE', `/devis/${uuid0}`)).json.erreur, 'decoupe_en_cours');
   assert.equal(d.progression, null, 'devis prêt : plus de progression');
   for (const id of ids) srv.db.prepare('DELETE FROM devis WHERE id = ?').run(id);
+});
+
+test('multiplicateur de taille : STL en mètres (Blender) x1000 -> pièce à la bonne taille pour Orca', async () => {
+  const carol = new Client();
+  carol.csrf = (await carol.req('POST', '/connexion', { email: 'carol@test.local', motdepasse: 'un-mot-de-passe-solide' })).json.csrf;
+  const f = await carol.req('POST', '/fichiers', envoiStl('blender.stl', cube(0.02)));     // 20 mm exportés en mètres
+  assert.equal(f.statut, 201, 'un STL minuscule est accepté au dépôt');
+  const reglages = { remplissage_pct: 15, couches_surface: 3, proprete: 'fine' };
+  const creer = (echelle) => carol.req('POST', '/devis', { imprimante_id: 'kobra-1', reglages,
+    pieces: [{ fichier_id: f.json.id, quantite: 1, ...(echelle === undefined ? {} : { echelle }) }] });
+
+  assert.equal((await creer()).json.erreur, 'piece_trop_petite', 'sans multiplicateur : 0,02 mm');
+  assert.equal((await creer(0)).json.erreur, 'echelle_invalide');
+  assert.equal((await creer(100000)).json.erreur, 'echelle_invalide');
+  const d = await devisDecoupe(carol, (await creer(1000)).json.id);
+  assert.equal(d.statut, 'pret', d.erreur);
+  assert.equal(d.pieces[0].echelle, 1000);
+  assert.deepEqual(d.pieces[0].dims_mm.map((v) => Math.round(v * 100) / 100), [20, 20, 20]);
+  assert.match(gcodeDuDevis(d.id), /; piece1_x = 20\n/, 'Orca reçoit la pièce de 20 mm');
+  // trop grande une fois agrandie
+  const g = await carol.req('POST', '/fichiers', envoiStl('cm.stl', cube(20)));
+  assert.equal((await carol.req('POST', '/devis', { imprimante_id: 'kobra-1', reglages,
+    pieces: [{ fichier_id: g.json.id, quantite: 1, echelle: 25.4 }] })).json.erreur, 'piece_trop_grande');
+  for (const { id } of srv.db.prepare("SELECT id FROM devis WHERE statut IN ('attente', 'decoupe') AND client_id = (SELECT id FROM clients WHERE email = 'carol@test.local')").all()) {
+    await devisDecoupe(carol, id);
+  }
 });
 
 test('suppression d\'un devis : devis, STL (base + disque) et gcode effacés ; STL partagé gardé', async () => {
@@ -394,9 +428,10 @@ test('suppression d\'un devis : devis, STL (base + disque) et gcode effacés ; S
   const d1 = await creer([seul, partage]);
   const d2 = await creer([partage]);
   assert.equal(d1.statut, 'pret');
-  const fichierDisque = (id) => srv.db.prepare('SELECT chemin FROM fichiers_stl WHERE id = ?').get(id)?.chemin;
+  const fichierDisque = (id) => srv.db.prepare('SELECT chemin FROM fichiers_stl WHERE uuid = ?').get(id)?.chemin;
   const disqueSeul = path.join(srv.config.donnees, fichierDisque(seul));
-  const gcode = path.join(srv.config.donnees, srv.db.prepare('SELECT gcode_chemin FROM devis WHERE id = ?').get(d1.id).gcode_chemin);
+  const gcode = path.join(srv.config.donnees, srv.db.prepare('SELECT gcode_chemin FROM devis WHERE uuid = ?').get(d1.id).gcode_chemin);
+  const n1 = interne('devis', d1.id);
   assert.ok(fs.existsSync(disqueSeul) && fs.existsSync(gcode));
 
   // un autre client ne peut pas le supprimer
@@ -409,7 +444,7 @@ test('suppression d\'un devis : devis, STL (base + disque) et gcode effacés ; S
   assert.equal(fichierDisque(seul), undefined, 'STL retiré de la base');
   assert.ok(!fs.existsSync(disqueSeul), 'STL retiré du disque');
   assert.ok(!fs.existsSync(gcode), 'gcode supprimé');
-  assert.ok(!fs.readdirSync(path.join(srv.config.donnees, 'gcode')).some((n) => n.startsWith(`devis-${d1.id}.`)), 'aperçu supprimé');
+  assert.ok(!fs.readdirSync(path.join(srv.config.donnees, 'gcode')).some((n) => n.startsWith(`devis-${n1}.`)), 'aperçu supprimé');
   // le STL partagé reste pour l'autre devis, toujours prêt
   assert.ok(fichierDisque(partage));
   assert.equal((await carol.req('GET', `/devis/${d2.id}`)).json.statut, 'pret');
@@ -447,7 +482,7 @@ test('admin : commande payée -> rappels de validation ; validation -> 4 rappels
     livraison_cts, total_cts, cree_le) VALUES (?, ?, 'Alice', '{"ville":"Paris"}', 1000, 500, 1500, ?)`).run(clientId, devisId, Date.now()).lastInsertRowid);
   assert.equal(srv.app.locals.boutique.marquerPayee(commandeId, 'pi_test'), true);
   assert.equal(srv.db.prepare("SELECT count(*) n FROM rappels WHERE commande_id = ? AND echeance = 'validation'").get(commandeId).n, 2);
-  const f = srv.db.prepare('SELECT * FROM fichiers_stl WHERE id = ?').get(fichierId);
+  const f = srv.db.prepare('SELECT * FROM fichiers_stl WHERE uuid = ?').get(fichierId);
   assert.equal(f.expire_le - f.cree_le, 730 * JOUR, 'STL commandé gardé 2 ans');
 
   const liste = await admin.req('GET', '/boutique/commandes?statut=payee');
@@ -478,7 +513,7 @@ test('admin : refuser demande la 2FA, puis répond honnêtement que Stripe n\'es
 test('admin : gcode découpé par le serveur pour les commandes payées, plus aucun STL, résumé', async () => {
   // plus aucun accès aux fichiers envoyés par les clients
   assert.equal((await admin.req('GET', '/boutique/stl?q=cube')).statut, 404);
-  assert.equal((await admin.req('GET', `/boutique/stl/${fichierId}/fichier`)).statut, 404);
+  assert.equal((await admin.req('GET', `/boutique/stl/${interne('fichiers_stl', fichierId)}/fichier`)).statut, 404);
 
   const devisId = srv.db.prepare('SELECT devis_id FROM commandes WHERE id = ?').get(commandeId).devis_id;
   const g = await admin.req('GET', `/boutique/commandes/${commandeId}/gcode`);
@@ -511,6 +546,6 @@ test('tâche horaire : rappels dus envoyés aux admins, STL expirés supprimés,
   assert.equal(bilan.remboursees, 0, 'Stripe pas branché : rien de remboursé');
   assert.equal(srv.db.prepare('SELECT statut FROM commandes WHERE id = ?').get(commandeId).statut, 'validee');
   // le STL commandé (2 ans) reste, le gros cube jamais commandé (30 jours) part
-  assert.ok(srv.db.prepare("SELECT chemin FROM fichiers_stl WHERE id = ?").get(fichierId).chemin);
+  assert.ok(srv.db.prepare("SELECT chemin FROM fichiers_stl WHERE uuid = ?").get(fichierId).chemin);
   assert.equal(srv.db.prepare("SELECT count(*) n FROM fichiers_stl WHERE nom_origine = 'gros.stl'").get().n, 0);
 });

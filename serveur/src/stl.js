@@ -1,12 +1,14 @@
 'use strict';
 // Lecture d'un fichier STL (binaire ou texte) : nombre de triangles, dimensions, volume.
-// Sert à refuser ce qui n'est pas un STL et à vérifier que la pièce rentre sur un plateau.
+// Sert à refuser ce qui n'est pas un STL, à vérifier que la pièce rentre sur un plateau, et à mettre une pièce
+// à l'échelle avant la découpe (STL exporté en mètres par Blender, par ex. : multiplicateur choisi par le client).
 
 const TRIANGLES_MAX = 3_000_000;
 
 class StlInvalide extends Error {}
 
-function analyserStl(buf) {
+// { n, sommet(i, k) -> [x, y, z] } pour un STL binaire ou texte
+function lire(buf) {
   if (!Buffer.isBuffer(buf) || buf.length < 84) throw new StlInvalide('fichier trop petit pour être un STL');
   // binaire : en-tête de 80 octets, nombre de triangles, puis 50 octets par triangle.
   // (certains STL binaires commencent aussi par "solid" : la taille exacte départage)
@@ -14,10 +16,10 @@ function analyserStl(buf) {
   if (84 + n * 50 === buf.length) {
     if (n === 0) throw new StlInvalide('aucun triangle');
     if (n > TRIANGLES_MAX) throw new StlInvalide(`trop de triangles (${n}, maximum ${TRIANGLES_MAX})`);
-    return mesurer(n, (i, k) => {
+    return { n, sommet: (i, k) => {
       const o = 84 + i * 50 + 12 + k * 12;
       return [buf.readFloatLE(o), buf.readFloatLE(o + 4), buf.readFloatLE(o + 8)];
-    });
+    } };
   }
   const debut = buf.subarray(0, 512).toString('latin1').trimStart();
   if (!debut.toLowerCase().startsWith('solid')) throw new StlInvalide('ni STL binaire, ni STL texte');
@@ -29,7 +31,12 @@ function analyserStl(buf) {
     if (sommets.length > TRIANGLES_MAX * 3) throw new StlInvalide('trop de triangles');
   }
   if (!sommets.length || sommets.length % 3) throw new StlInvalide('STL texte incomplet');
-  return mesurer(sommets.length / 3, (i, k) => sommets[i * 3 + k]);
+  return { n: sommets.length / 3, sommet: (i, k) => sommets[i * 3 + k] };
+}
+
+function analyserStl(buf) {
+  const { n, sommet } = lire(buf);
+  return mesurer(n, sommet);
 }
 
 function mesurer(n, sommet) {
@@ -49,8 +56,25 @@ function mesurer(n, sommet) {
   }
   const dims = [max[0] - min[0], max[1] - min[1], max[2] - min[2]];
   if (dims.some((d) => d > 10000)) throw new StlInvalide('pièce de plus de 10 m : unité incorrecte ?');
-  if (dims.every((d) => d < 0.1)) throw new StlInvalide('pièce vide ou minuscule');
+  // très petit (0,05 = 5 cm exportés en mètres) : accepté, le client règle le multiplicateur de taille
+  if (dims.every((d) => d < 1e-4)) throw new StlInvalide('pièce vide');
   return { triangles: n, dims, volume: Math.abs(volume) };
+}
+
+// STL (binaire ou texte) -> STL binaire dont toutes les coordonnées sont multipliées par k
+function echelonnerStl(buf, k) {
+  const { n, sommet } = lire(buf);
+  const sortie = Buffer.alloc(84 + n * 50);
+  sortie.write(`mis a l'echelle x${k}`.slice(0, 80), 0, 'latin1');
+  sortie.writeUInt32LE(n, 80);
+  for (let i = 0; i < n; i++) {
+    const o = 84 + i * 50;                      // normale laissée à 0 : recalculée par le slicer
+    for (let s = 0; s < 3; s++) {
+      const p = sommet(i, s);
+      for (let d = 0; d < 3; d++) sortie.writeFloatLE(p[d] * k, o + 12 + s * 12 + d * 4);
+    }
+  }
+  return sortie;
 }
 
 // la pièce tient-elle sur le plateau ? (rotation de 90° autorisée sur le plateau)
@@ -60,4 +84,4 @@ function tientSur(dims, imp) {
   return (x <= imp.plateau_x_mm && y <= imp.plateau_y_mm) || (y <= imp.plateau_x_mm && x <= imp.plateau_y_mm);
 }
 
-module.exports = { analyserStl, tientSur, StlInvalide };
+module.exports = { analyserStl, echelonnerStl, tientSur, StlInvalide };

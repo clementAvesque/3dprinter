@@ -32,8 +32,15 @@ export function ranger(pieces, plateau) {
       yLibre += it.h + MARGE;
     }
     if (!e) { hors.push({ id: it.id, n: it.n }); continue; }
-    places.push({ id: it.id, n: it.n, x: e.x + it.l / 2, y: e.y + it.h / 2, rot: it.rot || 0 });
+    places.push({ id: it.id, n: it.n, x: e.x + it.l / 2, y: e.y + it.h / 2, rot: it.rot || 0, l: it.l, h: it.h });
     e.x += it.l + MARGE;
+  }
+  // le groupe de pièces est centré sur le plateau (comme le fera Orca), bien visible dans la vue 3D
+  if (places.length) {
+    const x0 = Math.min(...places.map((p) => p.x - p.l / 2)), x1 = Math.max(...places.map((p) => p.x + p.l / 2));
+    const y0 = Math.min(...places.map((p) => p.y - p.h / 2)), y1 = Math.max(...places.map((p) => p.y + p.h / 2));
+    const dx = (L - x1 - x0) / 2, dy = (H - y1 - y0) / 2;
+    for (const p of places) { p.x += dx; p.y += dy; delete p.l; delete p.h; }
   }
   return { places, hors };
 }

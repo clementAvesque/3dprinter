@@ -16,6 +16,7 @@ const zlib = require('node:zlib');
 const { spawn } = require('node:child_process');
 const { pipeline } = require('node:stream/promises');
 const { lireGcode } = require('./trajets');
+const { echelonnerStl } = require('./stl');
 
 // réglage « propreté » du devis -> hauteur de couche et lissage envoyés à Orca.
 // « rapide » est stocké 0.4 (valeur d'origine de la conception) mais la Kobra 3 0.4 mm accepte 0.28 mm au plus.
@@ -43,7 +44,7 @@ function creerDecoupeur({ config, db, calculerPrix }) {
         (SELECT sum(f.triangles * p.quantite) FROM devis_pieces p JOIN fichiers_stl f ON f.id = p.fichier_id WHERE p.devis_id = d.id) triangles
       FROM devis d WHERE d.statut = 'pret' AND d.decoupe_debut_le IS NOT NULL ORDER BY d.decoupe_le DESC LIMIT 20`),
     devant: db.prepare("SELECT id, statut, decoupe_debut_le FROM devis WHERE statut = 'decoupe' OR (statut = 'attente' AND id < ?)"),
-    pieces: db.prepare(`SELECT p.quantite, f.chemin, f.nom_origine FROM devis_pieces p JOIN fichiers_stl f ON f.id = p.fichier_id
+    pieces: db.prepare(`SELECT p.quantite, p.echelle, f.chemin, f.nom_origine FROM devis_pieces p JOIN fichiers_stl f ON f.id = p.fichier_id
       WHERE p.devis_id = ? ORDER BY p.id`),
     imprimante: db.prepare('SELECT * FROM imprimantes WHERE id = ?'),
     pret: db.prepare(`UPDATE devis SET statut = 'pret', erreur = NULL, gcode_chemin = ?, poids_g = ?, duree_s = ?, nb_couches = ?,
@@ -127,6 +128,8 @@ function creerDecoupeur({ config, db, calculerPrix }) {
         if (!p.chemin) throw new ErreurDecoupe(`Le fichier ${p.nom_origine} n'est plus disponible : dépose-le à nouveau.`);
         const f = path.join(dossier, `piece-${i + 1}.stl`);
         await pipeline(fs.createReadStream(path.join(config.donnees, p.chemin)), zlib.createGunzip(), fs.createWriteStream(f));
+        // multiplicateur de taille choisi par le client : la pièce est mise à l'échelle avant Orca
+        if (p.echelle !== 1) fs.writeFileSync(f, echelonnerStl(fs.readFileSync(f), p.echelle));
         for (let k = 0; k < p.quantite; k++) stls.push(f);
       }
 

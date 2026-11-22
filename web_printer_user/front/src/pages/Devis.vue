@@ -85,7 +85,7 @@ const supprimable = computed(() => devis.value && devis.value.statut !== 'decoup
   && !(devis.value.commande && devis.value.commande.statut !== 'abandonnee'));
 const suppression = ref(false);
 async function supprimer() {
-  if (!window.confirm(`Supprimer le devis n° ${devis.value.id} ? Ses fichiers STL et sa découpe seront effacés définitivement.`)) return;
+  if (!window.confirm(`Supprimer le devis ${devis.value.ref} ? Ses fichiers STL et sa découpe seront effacés définitivement.`)) return;
   suppression.value = true;
   erreur.value = '';
   try {
@@ -102,7 +102,7 @@ async function supprimer() {
   <main class="page-texte">
     <p v-if="erreur" class="erreur">{{ erreur }}</p>
     <template v-if="devis">
-      <h1>Devis n° {{ devis.id }}</h1>
+      <h1>Devis {{ devis.ref }}</h1>
       <div class="carte statut" :class="devis.statut">
         <b>{{ statut[0] }}</b>
         <span v-if="statut[1]">{{ statut[1] }}</span>
@@ -142,7 +142,7 @@ async function supprimer() {
         <div><span>Matière ({{ mm(devis.poids_g) }} g)</span><b>{{ euros(devis.prix_matiere_cts) }}</b></div>
         <div><span>Livraison</span><b>{{ euros(devis.livraison_cts) }}</b></div>
         <div class="total"><span>Total</span><b>{{ euros(devis.total_cts) }}</b></div>
-        <p v-if="payee" class="paye">Commande n° {{ devis.commande.id }} payée. <RouterLink to="/compte" class="lien">Suivre ma commande</RouterLink></p>
+        <p v-if="payee" class="paye">Commande {{ devis.commande.ref }} payée. <RouterLink to="/compte" class="lien">Suivre ma commande</RouterLink></p>
         <button v-else class="primaire" @click="$router.push(`/commande/${devis.id}`)">Commander · {{ euros(devis.total_cts) }}</button>
       </div>
 
