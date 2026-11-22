@@ -349,12 +349,14 @@ print(p.ace.fils)             # [{"color": "#ff0000", "emplacement": 1}, {"color
 | Méthode | Description |
 |---|---|
 | `update()` / `init_fil()` | relit l'ACE seul |
-| `start_dry(temp=50, duration=240)` | séchage (°C, minutes) |
-| `stop_dry()` | arrête le séchage |
-| `feed(slot, length=100, speed=25)` | pousse le filament du slot 1 à 4 vers l'imprimante |
-| `retract(slot, length=100, speed=25)` | ramène le filament dans l'ACE |
+| `start_dry(temp=50, duration=240, fan_speed=0)` | séchage (°C, minutes) : `POST /server/filament_hub/start_drying` (module `mmu_ace` de Rinkhals) |
+| `stop_dry()` | arrête le séchage : `POST /server/filament_hub/stop_drying` |
+| `feed(slot, length=100, speed=25)` | pousse le filament du slot 1 à 4 vers la tête : `FEED_FILAMENT` (buse chaude obligatoire) |
+| `retract(slot, length=100, speed=20)` | ramène le filament dans l'ACE : `UNWIND_FILAMENT` |
 
-> ⚠️ Les commandes gcode de l'ACE (`ACE_START_DRYING`, `ACE_FEED`...) et la sélection `T0`–`T3` sont **supposées**. Vérifie-les avec la doc Rinkhals avant de t'en servir.
+> Commandes vérifiées sur la Kobra 3 (Rinkhals 20261101) : ce sont celles qu'utilise Rinkhals lui-même. Il n'y a
+> **pas** de gcode de séchage, et le firmware répond « ok » à une commande qu'il ne connaît pas : une commande
+> inventée a l'air de marcher sans rien faire. Les macros `T0`–`T3` existent (`/printer/objects/list`).
 
 ---
 

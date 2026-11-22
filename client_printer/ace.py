@@ -1,7 +1,8 @@
 import json
 
+from .config import MOONRAKER_PORT
 from .state import State
-from .utils import gcode, query_status
+from .utils import gcode, query_status, req_send
 
 
 class Ace:
@@ -86,34 +87,46 @@ class Ace:
 
         return self.fils
 
-    def start_dry(self, temp=50, duration=240):
-        # lance le séchage : temp en °C, duration en minutes
-        # /!\ commande gcode supposée, à vérifier avec ta doc Rinkhals
-        res = gcode(self.url, f"ACE_START_DRYING TEMP={int(temp)} DURATION={int(duration)}")
+    # Séchage : il n'existe pas de commande gcode pour ça sur la Kobra 3 (vérifié : /printer/gcode/help).
+    # Rinkhals l'expose par son module Moonraker « mmu_ace » : POST /server/filament_hub/start_drying et
+    # /stop_drying (id = numéro de l'ACE, 0 pour le premier). Contrairement à son gcode MMU_DRYER_START,
+    # ces adresses renvoient une vraie erreur si l'ACE refuse.
+
+    def _dryer(self, action, **params):
+        return req_send("POST", f"http://{self.url}:{MOONRAKER_PORT}/server/filament_hub/{action}",
+                        json={"id": 0, **params}, timeout=15)
+
+    def start_dry(self, temp=50, duration=240, fan_speed=0):
+        # lance le séchage : temp en °C (45 PLA, 55 PETG, 65 ABS), duration en minutes
+        res = self._dryer("start_drying", temp=int(temp), duration=int(duration), fan_speed=int(fan_speed))
         if not res.get("error"):
             self.state.DRY()
         return res
 
     def stop_dry(self):
         # arrête le séchage
-        # /!\ commande gcode supposée, à vérifier avec ta doc Rinkhals
-        res = gcode(self.url, "ACE_STOP_DRYING")
+        res = self._dryer("stop_drying")
         if not res.get("error"):
             self.state.ON()
         return res
 
-    def feed(self, slot, length=100, speed=25):
-        # pousse le filament du slot (1..4) vers l'imprimante : length en mm, speed en mm/s
-        # /!\ commande gcode supposée, à vérifier avec ta doc Rinkhals
-        if slot not in (1, 2, 3, 4):
-            return {"error": "slot doit valoir 1, 2, 3 ou 4"}
-        return gcode(self.url, f"ACE_FEED INDEX={slot - 1} LENGTH={int(length)} SPEED={int(speed)}",
-                     timeout=int(length / max(speed, 1)) + 15)
+    # Avancer / reculer le filament : commandes du firmware Anycubic (GoKlipper), celles qu'utilise Rinkhals
+    # pour son MMU_LOAD / MMU_UNLOAD. Vérifié sur la Kobra 3 : FEED_FILAMENT refuse si la buse est froide
+    # (« Extruder must heat up first »), UNWIND_FILAMENT refuse si aucun fil n'est dans l'extrudeur.
+    # /!\ Attention : le firmware répond « ok » à une commande qu'il ne connaît pas ; seules ces commandes-là
+    # (vérifiées) sont fiables. ID = numéro de l'ACE (0), INDEX = emplacement 0..3.
 
-    def retract(self, slot, length=100, speed=25):
-        # ramène le filament du slot (1..4) dans l'ACE
-        # /!\ commande gcode supposée, à vérifier avec ta doc Rinkhals
+    def feed(self, slot, length=100, speed=25):
+        # pousse le filament de l'emplacement (1..4) vers la tête : length en mm, speed en mm/s.
+        # La buse doit être chaude (voir Printer.load_filament, qui chauffe d'abord).
         if slot not in (1, 2, 3, 4):
             return {"error": "slot doit valoir 1, 2, 3 ou 4"}
-        return gcode(self.url, f"ACE_RETRACT INDEX={slot - 1} LENGTH={int(length)} SPEED={int(speed)}",
-                     timeout=int(length / max(speed, 1)) + 15)
+        return gcode(self.url, f"FEED_FILAMENT ID=0 INDEX={slot - 1} LENGTH={int(length)} SPEED={int(speed)}",
+                     timeout=int(length / max(speed, 1)) + 30)
+
+    def retract(self, slot, length=100, speed=20):
+        # ramène dans l'ACE le filament de l'emplacement (1..4) (voir Printer.unload_filament)
+        if slot not in (1, 2, 3, 4):
+            return {"error": "slot doit valoir 1, 2, 3 ou 4"}
+        return gcode(self.url, f"UNWIND_FILAMENT ID=0 INDEX={slot - 1} LENGTH={int(length)} SPEED={int(speed)}",
+                     timeout=int(length / max(speed, 1)) + 30)

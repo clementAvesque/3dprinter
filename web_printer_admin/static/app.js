@@ -188,20 +188,16 @@ function afficherTache(t, synchro) {
 }
 
 // ---------------------------------------------------------------------------
-// Caméra : flux vidéo MJPEG lu directement sur l'imprimante (une seule connexion ouverte).
+// Caméra : flux vidéo MJPEG relayé par ce serveur (/api/camera/video) : marche aussi hors du réseau de
+// l'imprimante (le navigateur ne joint jamais l'imprimante directement).
 // Si le flux est coupé : nouvel essai toutes les 15 s, pour ne pas surcharger l'imprimante.
 // ---------------------------------------------------------------------------
 
-async function demarrerFlux() {
-  try {
-    const { stream_url } = await (await fetch("/api/camera/stream")).json();
-    $("cam").hidden = false;
-    $("cam-off").hidden = true;
-    $("cam").src = "";              // force le navigateur à rouvrir le flux
-    $("cam").src = stream_url;
-  } catch {
-    setTimeout(demarrerFlux, 15000);
-  }
+function demarrerFlux() {
+  $("cam").hidden = false;
+  $("cam-off").hidden = true;
+  $("cam").src = "";                // force le navigateur à rouvrir le flux
+  $("cam").src = `/api/camera/video?t=${Date.now()}`;
 }
 $("cam").onerror = () => {
   if (!$("cam").getAttribute("src")) return;      // src vidé volontairement par demarrerFlux

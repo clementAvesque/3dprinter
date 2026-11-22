@@ -188,13 +188,41 @@ def api_camera():
 
 @app.get("/api/camera/stream")
 def api_camera_stream():
-    # adresse du flux vidéo MJPEG ; le navigateur l'affiche directement dans un <img>,
-    # sans passer par ce serveur (une seule connexion, pas de charge en plus pour Flask)
+    # adresse du flux vidéo MJPEG sur l'imprimante (réseau local seulement ; la page utilise /api/camera/video)
     url = printer.camera.get_stream_url()
     # réglage perdu à chaque redémarrage de l'imprimante : on le remet à chaque ouverture du flux
     # (en arrière-plan, pour ne pas retarder l'affichage) ; sans lui la caméra tombe à 0,2 image/s
     threading.Thread(target=printer.camera.fast_mode, daemon=True).start()
     return jsonify({"stream_url": url})
+
+
+@app.get("/api/camera/video")
+def api_camera_video():
+    # flux vidéo MJPEG RELAYÉ par ce serveur : le navigateur ne parle qu'à Flask, jamais à l'imprimante.
+    # Ainsi la caméra marche aussi hors du réseau de l'imprimante (Tailscale, 4G...), où l'adresse
+    # 192.168.x.x de l'imprimante est injoignable. Une connexion à l'imprimante par page ouverte.
+    import requests                      # même dépendance que client_printer (importée au besoin)
+    url = printer.camera.get_stream_url()
+    threading.Thread(target=printer.camera.fast_mode, daemon=True).start()
+    try:
+        amont = requests.get(url, stream=True, timeout=(5, 30))
+    except requests.RequestException as e:
+        return jsonify({"error": f"caméra injoignable : {e}"}), 503
+    if amont.status_code != 200:
+        amont.close()
+        return jsonify({"error": f"caméra : HTTP {amont.status_code} (service mjpg-streamer arrêté ?)"}), 503
+
+    def relayer():
+        # page fermée : Flask arrête le générateur, la connexion à l'imprimante est fermée aussi
+        try:
+            for morceau in amont.iter_content(chunk_size=16384):
+                if morceau:
+                    yield morceau
+        finally:
+            amont.close()
+
+    return Response(relayer(), content_type=amont.headers.get("Content-Type", "multipart/x-mixed-replace;boundary=boundarydonotcross"),
+                    headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})
 
 
 # ---------------------------------------------------------------------------
