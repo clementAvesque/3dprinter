@@ -45,7 +45,7 @@
   "cooling_tube_length": "0",
   "cooling_tube_retraction": "0",
   "deretraction_speed": [
-    "60"
+    "160"
   ],
   "emit_machine_limits_to_gcode": "1",
   "enable_filament_ramming": "0",
@@ -207,19 +207,19 @@
     "0"
   ],
   "retract_when_changing_layer": [
-    "1"
+    "0"
   ],
   "retraction_distances_when_cut": [
     "18"
   ],
   "retraction_length": [
-    "1"
+    "0.4"
   ],
   "retraction_minimum_travel": [
-    "1"
+    "2"
   ],
   "retraction_speed": [
-    "60"
+    "160"
   ],
   "scan_first_layer": "0",
   "silent_mode": "1",
@@ -237,13 +237,13 @@
   "use_firmware_retraction": "0",
   "use_relative_e_distances": "1",
   "wipe": [
-    "1"
+    "0"
   ],
   "wipe_distance": [
     "2"
   ],
   "z_hop": [
-    "0.4"
+    "0"
   ],
   "z_hop_types": [
     "Slope Lift"

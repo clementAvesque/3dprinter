@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Bon de colis · Imprimantes</title>
+  <link rel="icon" href="icones/icone.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="page-bon">
+
+<div class="bon-outils">
+  <a href="boutique.html" class="lien">← Boutique</a>
+  <span class="grow"></span>
+  <button id="imprimer" class="primaire" disabled>Imprimer</button>
+</div>
+
+<!-- page à imprimer et à glisser dans le colis : adresse, contenu à vérifier, plaques d'origine -->
+<main id="bon" class="bon">
+  <p id="bon-message" class="muted">Chargement de la commande…</p>
+</main>
+
+<div id="toasts" class="toasts"></div>
+<script src="config.js"></script>
+<script src="commun.js"></script>
+<script src="bon.js"></script>
+</body>
+</html>

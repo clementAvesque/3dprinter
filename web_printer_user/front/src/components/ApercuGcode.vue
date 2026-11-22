@@ -1,5 +1,6 @@
 <script setup>
-// Aperçu 3D, couche par couche, du gcode découpé par le serveur (OrcaSlicer) pour un devis.
+// Aperçu 3D, couche par couche, du gcode découpé par le serveur (OrcaSlicer) pour un devis, ou pour un projet
+// de la galerie (source = /api/client/galerie/<id>).
 // Données : /api/client/devis/:id/trajets (couches) et /trajets-bin (segments), format décrit dans
 // serveur/src/trajets.js. Le gcode lui-même n'est jamais envoyé au navigateur.
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
@@ -7,7 +8,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 const props = defineProps({
-  devisId: { type: [Number, String], required: true },
+  devisId: { type: [Number, String], default: null },
+  source: { type: String, default: '' },                       // adresse de base des trajets (sinon : le devis)
   plateau: { type: Array, default: () => [250, 250] },        // [x, y] en mm
 });
 
@@ -73,7 +75,7 @@ function afficherJusqua(i) {
 }
 
 async function charger() {
-  const base = `/api/client/devis/${encodeURIComponent(props.devisId)}`;
+  const base = props.source || `/api/client/devis/${encodeURIComponent(props.devisId)}`;
   const [rm, rb] = await Promise.all([fetch(`${base}/trajets`, { credentials: 'same-origin' }),
     fetch(`${base}/trajets-bin`, { credentials: 'same-origin' })]);
   if (!rm.ok || !rb.ok) throw new Error('aperçu indisponible');

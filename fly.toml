@@ -1,0 +1,62 @@
+# Déploiement du serveur sur Fly.io (voir serveur/README.md, section « Mise en ligne sur Fly.io »).
+# 1 seule machine : l'état des imprimantes est en mémoire et un seul agent se connecte.
+
+app = "passerelle-printer-server"  # nom de l'app sur Fly : donne passerelle-printer-server.fly.dev
+primary_region = "cdg"             # Paris
+# mémoire d'échange sur le disque : OrcaSlicer peut dépasser 1 Go sur un plateau chargé (30 pièces : ~850 Mo).
+# Sans elle, le système tue Orca ; avec, la découpe est seulement plus lente.
+swap_size_mb = 2048
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  API_HOTE = "0.0.0.0"             # le proxy Fly se connecte à la machine : pas 127.0.0.1
+  API_PORT = "3000"
+  TRUST_PROXY = "1"                # 1 proxy devant (Fly)
+  ENTETE_IP_CLIENT = "fly-client-ip"   # vraie IP des visiteurs, écrite par Fly (limites de débit, audit)
+  AGENT_HOTE = "0.0.0.0"
+  AGENT_PORT = "8443"
+  AGENT_PROXY_PROTOCOL = "1"       # vraie IP de l'agent transmise par Fly (handler proxy_proto)
+  DONNEES = "/data"
+  # AGENT_IPS_AUTORISEES = "x.x.x.x"   # IP publique de ta box, si elle est fixe
+  # ORIGINE_SITE = "https://ton-site.vercel.app"   # quand le site sera en ligne
+
+# disque persistant : comptes, sessions, journal d'audit (SQLite) et caches
+[mounts]
+  source = "donnees"
+  destination = "/data"
+
+# API du site : Fly gère le HTTPS sur 443 et transmet en HTTP à Node
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "off"       # jamais arrêtée : l'agent doit rester connecté
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "15s"
+    interval = "30s"
+    timeout = "5s"
+    method = "GET"
+    path = "/sante"
+
+# WebSocket de l'agent : TCP brut (Fly ne touche pas au TLS), c'est Node qui vérifie le certificat
+# client. proxy_proto ajoute la vraie IP de l'agent en tête de connexion.
+[[services]]
+  protocol = "tcp"
+  internal_port = 8443
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[services.ports]]
+    port = 8443
+    handlers = ["proxy_proto"]
+    proxy_proto_options = { version = "v1" }   # format lu par le serveur (src/hub.js)
+
+[[vm]]
+  memory = "1gb"                  # OrcaSlicer découpe sur cette machine (voir serveur/README.md)
+  cpu_kind = "shared"
+  cpus = 1

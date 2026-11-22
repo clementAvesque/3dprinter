@@ -75,6 +75,7 @@ async function demarrer(config = charger()) {
     config, db, hub, app, serveurApi,
     async arreter() {
       await app.locals.boutique?.decoupeur.arreter();
+      await app.locals.boutique?.plaques.arreter();
       await hub.arreter();
       serveurApi.closeAllConnections?.();
       await new Promise((ok) => serveurApi.close(() => ok()));

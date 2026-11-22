@@ -251,7 +251,7 @@ class Session:
                                         "h": hashlib.sha256(), "recu": 0, "index": 0, "fin": fin}
         try:
             await asyncio.wait_for(fin, timeout=LIMITES["reponse_longue_ms"] / 1000)
-            return await asyncio.to_thread(machine.recevoir_gcode, fichier)
+            return await asyncio.to_thread(machine.recevoir_gcode, fichier, p["fichier"])
         except asyncio.TimeoutError:
             return {"ok": False, "erreur": "transfert_incomplet"}
         except Violation as e:

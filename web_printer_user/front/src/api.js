@@ -31,6 +31,22 @@ const MESSAGES = {
   email_invalide: 'Cette adresse e-mail n\'est pas valide.',
   nom_invalide: 'Indique un nom (80 caractères maximum).',
   origine_refusee: 'Le serveur refuse les requêtes venant de cette adresse (ORIGINE_SITE).',
+  trop_de_devis: "3 devis au plus en cours de découpe : attends qu'ils soient prêts.",
+  pseudo_invalide: 'Pseudo de 3 à 24 caractères : lettres, chiffres, espaces, point, tiret ou souligné.',
+  pseudo_pris: 'Ce pseudo est déjà pris : choisis-en un autre.',
+  pseudo_requis: "Choisis d'abord un pseudo (onglet Profil) : il signe tes projets dans la galerie.",
+  titre_invalide: 'Donne un titre à ton projet (60 caractères au plus).',
+  pas_encore_realise: 'Seul un projet déjà imprimé peut être publié.',
+  projet_d_un_autre: 'Ce devis vient de la galerie : seul son auteur peut le publier.',
+  projet_inconnu: "Ce projet n'est plus dans la galerie.",
+  projet_indisponible: "Ce projet n'est plus disponible.",
+  publication_inconnue: 'Publication introuvable.',
+  fichier_indisponible: 'Un fichier de ce projet a été supprimé.',
+  ancien_mot_de_passe_invalide: 'Mot de passe actuel incorrect.',
+  mot_de_passe_invalide: 'Mot de passe incorrect.',
+  commande_en_cours: 'Une commande est en cours : attends sa livraison.',
+  trop_d_adresses: '20 adresses au plus.',
+  imprimante_indisponible: "L'imprimante de ce projet n'est pas disponible pour le moment.",
 };
 
 export class ErreurApi extends Error {

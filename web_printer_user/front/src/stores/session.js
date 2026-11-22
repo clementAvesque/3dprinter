@@ -23,6 +23,10 @@ export const useSession = defineStore('session', {
     async connexion(email, motdepasse) {
       this.ouvrir(await api('POST', '/connexion', { email, motdepasse }));
     },
+    // profil modifié (nom, pseudo) ou compte supprimé
+    mettreAJour(client) {
+      this.client = client;
+    },
     async deconnexion() {
       await api('POST', '/deconnexion', {}).catch(() => {});
       poserCsrf('');

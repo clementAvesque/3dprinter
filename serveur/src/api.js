@@ -65,7 +65,7 @@ function creerApi({ config, db, hub, journal, courriel = creerCourriel(config), 
   const auth = creerAuth({ db, config, journal });
   const { exige, confirme } = auth;
   const clients = creerClients({ db, config, journal, courriel });
-  const boutique = creerBoutique({ config, db, journal, courriel, paiements, clients, exige, confirme });
+  const boutique = creerBoutique({ config, db, hub, journal, courriel, paiements, clients, exige, confirme });
   app.locals.boutique = boutique;
   app.locals.courriel = courriel;
   // vérification de santé de l'hébergeur : ne révèle rien (ni état de l'agent, ni version)
@@ -329,13 +329,16 @@ function creerApi({ config, db, hub, journal, courriel = creerCourriel(config), 
       if (quoi === 'thumbnail') {
         const o = await obtenir(req, m, nom, 'file.thumbnail', '.img');
         if (o.r) return repondre(res, o.r);
-        res.set({ 'Content-Type': fs.readFileSync(`${o.bin}.mime`, 'utf8'), 'Cache-Control': 'private, max-age=3600' });
+        // no-cache : le navigateur garde une copie mais la revalide (ETag) à chaque fois. Un même nom de fichier
+        // peut désigner un autre gcode (fichier remplacé) : une copie gardée 1 h sans vérifier était fausse.
+        res.set({ 'Content-Type': fs.readFileSync(`${o.bin}.mime`, 'utf8'), 'Cache-Control': 'private, no-cache' });
         return res.sendFile(o.bin);
       }
       const o = await obtenir(req, m, nom, 'file.toolpath', '.bin', '.json');
       if (o.r) return repondre(res, o.r);
+      res.set('Cache-Control', 'private, no-cache');
       if (quoi === 'toolpath') return res.type('application/json').sendFile(o.meta);
-      res.set({ 'Content-Type': 'application/octet-stream', 'Cache-Control': 'private, max-age=3600' });
+      res.set('Content-Type', 'application/octet-stream');
       return res.sendFile(o.bin);
     } catch (e) { erreur(res, e); }
   }));

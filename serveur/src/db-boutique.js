@@ -9,6 +9,45 @@ const IMPRIMANTES_DEFAUT = [
   { id: 'kobra-1', nom: 'Kobra 3', x: 250, y: 250, z: 260, buse: 0.4, profil: 'kobra3' },
 ];
 
+// Plaques (table lots) : un plateau imprimé d'un coup. Étape 1 : une plaque par devis d'une commande validée ;
+// étape 2 : plusieurs commandes fusionnées sur une plaque (d'où lot_pieces, pièce par pièce).
+//   a_envoyer -> a_faire (gcode dans « a_faire/ » de l'imprimante) -> en_impression -> imprimee (à valider)
+//   -> validee (rangée dans « imprimees/ ») ; ratée : retour à a_faire ; annulee : commande remboursée
+const SCHEMA_PLAQUES = `
+    CREATE TABLE IF NOT EXISTS lots (
+      id              INTEGER PRIMARY KEY,
+      imprimante_id   TEXT NOT NULL REFERENCES imprimantes(id),
+      proprete_mm     REAL NOT NULL CHECK (proprete_mm IN (0.2, 0.4)),
+      statut          TEXT NOT NULL DEFAULT 'a_envoyer' CHECK (statut IN (
+                        'a_envoyer', 'a_faire', 'en_impression', 'imprimee', 'validee', 'annulee')),
+      gcode_chemin    TEXT,                                -- gcode sur le serveur (celui du devis à l'étape 1)
+      fichier_machine TEXT,                                -- nom sur l'imprimante : a_faire/P0007_... puis imprimees/...
+      rangement       TEXT,                                -- déplacement vers imprimees/ pas encore fait (agent absent)
+      duree_s         INTEGER,
+      tentatives      INTEGER NOT NULL DEFAULT 0,
+      erreur          TEXT,
+      cree_le         INTEGER NOT NULL,
+      envoye_le       INTEGER,
+      lance_le        INTEGER,
+      fini_le         INTEGER,
+      valide_le       INTEGER,
+      valide_par      INTEGER REFERENCES utilisateurs(id)
+    );
+    CREATE INDEX IF NOT EXISTS lots_statut ON lots(statut);
+
+    CREATE TABLE IF NOT EXISTS lot_pieces (
+      id               INTEGER PRIMARY KEY,
+      lot_id           INTEGER NOT NULL REFERENCES lots(id) ON DELETE CASCADE,
+      devis_piece_id   INTEGER NOT NULL REFERENCES devis_pieces(id),
+      quantite         INTEGER NOT NULL,
+      remplissage_pct  INTEGER NOT NULL,                   -- repris du devis : réglage par objet dans Orca
+      couches_surface  INTEGER NOT NULL,
+      pos_x_mm         REAL,
+      pos_y_mm         REAL
+    );
+    CREATE INDEX IF NOT EXISTS lot_pieces_lot ON lot_pieces(lot_id);
+    CREATE INDEX IF NOT EXISTS lot_pieces_piece ON lot_pieces(devis_piece_id);`;
+
 function schemaBoutique(db) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS clients (
@@ -192,36 +231,16 @@ function schemaBoutique(db) {
       UNIQUE (commande_id, echeance, palier)
     );
 
-    -- plateau imprimé : une ou plusieurs commandes regroupées
-    CREATE TABLE IF NOT EXISTS lots (
-      id             INTEGER PRIMARY KEY,
-      imprimante_id  TEXT NOT NULL REFERENCES imprimantes(id),
-      proprete_mm    REAL NOT NULL CHECK (proprete_mm IN (0.2, 0.4)),
-      statut         TEXT NOT NULL DEFAULT 'propose' CHECK (statut IN (
-                       'propose', 'pret', 'a_refaire', 'en_impression', 'arrete', 'imprime')),
-      gcode_chemin   TEXT,
-      fichier_machine TEXT,                                -- nom du gcode envoyé à l'imprimante
-      duree_s        INTEGER,
-      tentatives     INTEGER NOT NULL DEFAULT 0,
-      cree_le        INTEGER NOT NULL,
-      lance_le       INTEGER,
-      arrete_le      INTEGER,
-      fini_le        INTEGER
-    );
-    CREATE INDEX IF NOT EXISTS lots_statut ON lots(statut);
-
-    CREATE TABLE IF NOT EXISTS lot_pieces (
-      id               INTEGER PRIMARY KEY,
-      lot_id           INTEGER NOT NULL REFERENCES lots(id) ON DELETE CASCADE,
-      devis_piece_id   INTEGER NOT NULL REFERENCES devis_pieces(id),
-      quantite         INTEGER NOT NULL,
-      remplissage_pct  INTEGER NOT NULL,                   -- repris du devis : réglage par objet dans Orca
-      couches_surface  INTEGER NOT NULL,
-      pos_x_mm         REAL,
-      pos_y_mm         REAL
-    );
-    CREATE INDEX IF NOT EXISTS lot_pieces_lot ON lot_pieces(lot_id);
+    ${SCHEMA_PLAQUES}
   `);
+
+  // ancienne table des lots (avant les plaques) : jamais utilisée, recréée si elle est vide
+  const ancienne = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'lots'").get()?.sql || '';
+  if (!ancienne.includes("'a_envoyer'")) {
+    const vide = db.prepare('SELECT (SELECT count(*) FROM lots) + (SELECT count(*) FROM lot_pieces) n').get().n === 0;
+    if (vide) db.exec(`DROP TABLE lot_pieces; DROP TABLE lots; ${SCHEMA_PLAQUES}`);
+    else console.error('[base] table lots ancienne et non vide : plaques désactivées tant qu\'elle n\'est pas migrée');
+  }
 
   // colonnes ajoutées après la mise en ligne (bases existantes : ajoutées au démarrage)
   const ajouterColonne = (table, colonne, type) => {
@@ -232,12 +251,30 @@ function schemaBoutique(db) {
   ajouterColonne('devis', 'decoupe_debut_le', 'INTEGER');     // début de la découpe : barre de progression du client
   ajouterColonne('devis_pieces', 'echelle', 'REAL NOT NULL DEFAULT 1');   // multiplicateur de taille (STL en mètres...)
 
+  // galerie : pseudo public d'un client (unique), projets réalisés publiés par leur auteur, devis créés d'après eux
+  ajouterColonne('clients', 'pseudo', 'TEXT');
+  ajouterColonne('devis', 'publication_id', 'INTEGER');         // devis créé depuis la galerie (projet d'un autre client)
+  db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS clients_pseudo ON clients(pseudo COLLATE NOCASE) WHERE pseudo IS NOT NULL;
+    CREATE TABLE IF NOT EXISTS publications (
+      id          INTEGER PRIMARY KEY,
+      uuid        TEXT UNIQUE,
+      client_id   INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+      devis_id    INTEGER NOT NULL UNIQUE REFERENCES devis(id) ON DELETE CASCADE,  -- le projet (devis commandé et imprimé)
+      titre       TEXT NOT NULL,
+      cree_le     INTEGER NOT NULL,
+      retiree_le  INTEGER,                                     -- retirée par son auteur (ou compte supprimé)
+      choisie     INTEGER NOT NULL DEFAULT 0                   -- nombre de devis créés d'après elle
+    );
+    CREATE INDEX IF NOT EXISTS publications_visibles ON publications(retiree_le, cree_le);
+  `);
+
   // identifiant public (UUID v4) de ce que voit le client : les numéros internes (1, 2, 3...) ne sortent jamais
   // du serveur, personne ne peut deviner combien de devis ou de commandes existent ni lire ceux des autres.
   // Rempli par un déclencheur à chaque insertion (quel que soit le code qui insère), et pour les lignes existantes.
   const UUID_SQL = `lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' || substr(lower(hex(randomblob(2))), 2)
     || '-' || substr('89ab', 1 + (abs(random()) % 4), 1) || substr(lower(hex(randomblob(2))), 2) || '-' || lower(hex(randomblob(6)))`;
-  for (const table of ['devis', 'commandes', 'fichiers_stl', 'adresses']) {
+  for (const table of ['devis', 'commandes', 'fichiers_stl', 'adresses', 'publications']) {
     ajouterColonne(table, 'uuid', 'TEXT');
     db.exec(`
       CREATE UNIQUE INDEX IF NOT EXISTS ${table}_uuid ON ${table}(uuid);

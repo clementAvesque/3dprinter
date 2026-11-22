@@ -1,9 +1,55 @@
-.venv/
+# Ce qui ne va PAS dans git. Règle simple : git garde le CODE et la CONFIGURATION SANS SECRET ;
+# tout ce qui est secret, propre à un PC, téléchargé, généré ou recréé tout seul reste en dehors.
+# Après un clone sur un autre poste : voir « Travailler depuis un autre poste » dans le README racine.
+
+# ---------------------------------------------------------------- secrets (jamais dans git)
+# clés et certificats de l'agent, du serveur (TLS, mTLS) ; cookie de session admin (curl)
+agent/secrets/
+agent/config.json
+serveur/pki/
+serveur/config.json
+serveur/.env
+.env
+*.pem
+*.key
+cookies.txt
 # archive de l'agent pour la Raspberry : contient ses clés
 agent-raspberry.tar.gz
-.claude/
-Dockerfile
-fly.toml
-# cookies de session (curl) et caches Python : jamais dans git
-cookies.txt
+
+# ---------------------------------------------------------------- données (propres à chaque machine)
+# bases SQLite, STL et gcodes des clients (production : sur le volume Fly ; dev : data-dev/)
+serveur/data/
+serveur/data-dev/
+*.db
+*.db-shm
+*.db-wal
+# librairie : gcodes téléchargés depuis l'imprimante, photos/vidéos/miniatures, historiques et index
+# (chemins Windows de ce PC dedans) : re-téléchargés ou recréés au premier lancement
+client_printer/gcode/
+client_printer/image/
+client_printer/data/
+agent/tmp/
+
+# ---------------------------------------------------------------- dépendances et fichiers générés
+# recréés par « npm ci », « npm run build » ou « pip install -r requirements.txt »
+node_modules/
+web_printer_user/front/dist/
+.venv/
+venv/
 __pycache__/
+*.py[cod]
+.pytest_cache/
+
+# ---------------------------------------------------------------- journaux
+*.log
+npm-debug.log*
+
+# ---------------------------------------------------------------- éditeur, système, outils locaux
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+# réglages de Claude Code sur ce PC (chemins absolus du PC)
+.claude/

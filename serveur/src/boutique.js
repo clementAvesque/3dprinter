@@ -15,9 +15,11 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const Busboy = require('busboy');
 const { asynchrone } = require('./auth');
+const S = require('./securite');
 const { analyserStl, tientSur, StlInvalide } = require('./stl');
 const { ErreurPaiement } = require('./paiements');
 const { creerDecoupeur } = require('./orca');
+const { creerPlaques } = require('./plaques');
 
 const gzip = promisify(zlib.gzip);
 const JOUR = 864e5;
@@ -57,12 +59,16 @@ const euros = (cts) => `${(cts / 100).toFixed(2).replace('.', ',')} €`;
 
 // ---------------------------------------------------------------- module
 
-function creerBoutique({ config, db, journal, courriel, paiements, clients, exige, confirme }) {
+function creerBoutique({ config, db, hub, journal, courriel, paiements, clients, exige, confirme }) {
   const B = config.boutique;
   const dossierStl = path.join(config.donnees, 'stl');
   fs.mkdirSync(dossierStl, { recursive: true });
   const decoupeur = creerDecoupeur({ config, db,
     calculerPrix: (poids) => ({ prix_matiere_cts: prixMatiere(B, poids), livraison_cts: prixLivraison(B, poids) }) });
+  // plaques à imprimer : créées à la validation d'une commande, envoyées dans « a_faire/ » sur l'imprimante
+  const plaques = creerPlaques({ config, db, hub, journal,
+    quandImprimee: (c) => prevenirClient(c, 'Ta commande est imprimée',
+      'Bonne nouvelle : toutes tes pièces sont imprimées et vérifiées. Nous préparons le colis, tu recevras le numéro de suivi à l\'envoi.') });
 
   const q = {
     imprimante: db.prepare('SELECT * FROM imprimantes WHERE id = ?'),
@@ -103,9 +109,19 @@ function creerBoutique({ config, db, journal, courriel, paiements, clients, exig
   const imprimantePublique = (i) => ({ id: i.id, nom: i.nom, plateau_mm: [i.plateau_x_mm, i.plateau_y_mm, i.plateau_z_mm],
     buse_mm: i.buse_mm, disponible: !!i.disponible });
 
+  // galerie : projet d'origine d'un devis créé depuis la galerie, publication d'un devis par son auteur
+  const galerieDe = (publicationId) => {
+    const p = db.prepare('SELECT p.uuid, p.titre, c.pseudo FROM publications p JOIN clients c ON c.id = p.client_id WHERE p.id = ?').get(publicationId);
+    return p ? { id: p.uuid, titre: p.titre, auteur: p.pseudo || 'ancien membre' } : null;
+  };
+  const publicationDuDevis = (devisId) => {
+    const p = db.prepare('SELECT uuid, titre, retiree_le, choisie FROM publications WHERE devis_id = ?').get(devisId);
+    return p && !p.retiree_le ? { id: p.uuid, titre: p.titre, choisie: p.choisie } : null;
+  };
+
   // devis vu par son client (identifiants publics) ou par l'admin (numéros internes en plus)
   function devisComplet(d, { admin = false } = {}) {
-    const pieces = db.prepare(`SELECT p.*, f.nom_origine, f.dim_x_mm, f.dim_y_mm, f.dim_z_mm, f.chemin, f.uuid fichier_uuid
+    const pieces = db.prepare(`SELECT p.*, f.nom_origine, f.dim_x_mm, f.dim_y_mm, f.dim_z_mm, f.chemin, f.uuid fichier_uuid, f.client_id fichier_client
       FROM devis_pieces p JOIN fichiers_stl f ON f.id = p.fichier_id WHERE p.devis_id = ? ORDER BY p.id`).all(d.id);
     const c = q.commandeDuDevis.get(d.id);
     return {
@@ -118,7 +134,11 @@ function creerBoutique({ config, db, journal, courriel, paiements, clients, exig
       cree_le: d.cree_le, decoupe_le: d.decoupe_le,
       commande: c ? { id: admin ? c.id : c.uuid, ref: ref(c.uuid), statut: c.statut } : null,
       progression: decoupeur.progression(d),
-      pieces: pieces.map((p, i) => ({ id: admin ? p.id : i + 1, fichier_id: admin ? p.fichier_id : p.fichier_uuid,
+      // galerie : projet d'un autre client (son fichier n'est jamais exposé) ; projet publié par son auteur
+      galerie: d.publication_id ? galerieDe(d.publication_id) : null,
+      publication: admin ? null : publicationDuDevis(d.id),
+      pieces: pieces.map((p, i) => ({ id: admin ? p.id : i + 1,
+        fichier_id: admin ? p.fichier_id : (p.fichier_client === d.client_id ? p.fichier_uuid : null),
         nom: p.nom_origine, quantite: p.quantite,
         dims_mm: [p.dim_x_mm, p.dim_y_mm, p.dim_z_mm].map((v) => v * p.echelle), echelle: p.echelle,
         pos_mm: [p.pos_x_mm, p.pos_y_mm], rotation_deg: p.rotation_deg,
@@ -187,9 +207,7 @@ function creerBoutique({ config, db, journal, courriel, paiements, clients, exig
     const now = Date.now();
     db.prepare(`UPDATE commandes SET statut = 'remboursee', rembourse_le = ?, rembourse_par = ?, motif_refus = coalesce(?, motif_refus),
       valide_par = coalesce(valide_par, ?) WHERE id = ?`).run(now, par, motif, adminId, commande.id);
-    db.prepare(`UPDATE lots SET statut = 'a_refaire' WHERE statut IN ('propose', 'pret') AND id IN (
-      SELECT lp.lot_id FROM lot_pieces lp JOIN devis_pieces p ON p.id = lp.devis_piece_id
-      WHERE p.devis_id IN (SELECT devis_id FROM commande_devis WHERE commande_id = ?))`).run(commande.id);
+    plaques.annulerPourCommande(commande.id);          // plaques pas encore imprimées : annulées
     const raisons = {
       admin: 'Nous ne pouvons pas imprimer ta commande. Elle t\'a été remboursée intégralement.',
       auto_validation: 'Ta commande n\'a pas pu être prise en charge à temps. Elle t\'a été remboursée intégralement.',
@@ -316,6 +334,7 @@ function creerBoutique({ config, db, journal, courriel, paiements, clients, exig
       JOIN commandes c ON c.id = cd.commande_id
       WHERE p.fichier_id = ? AND c.statut IN (${STATUTS_EN_COURS.map(() => '?').join(',')}) LIMIT 1`).get(f.id, ...STATUTS_EN_COURS);
     if (enCours) return res.status(409).json({ erreur: 'commande_en_cours', detail: 'ce fichier sert à une commande pas encore expédiée' });
+    retirerPublicationsDuFichier(f.id);
     effacerFichier(f);
     journal('client.fichier.supprimer', { req, cible: `${req.client.email} ${f.nom_origine}`, resultat: 'ok' });
     res.json({ ok: true });
@@ -325,6 +344,30 @@ function creerBoutique({ config, db, journal, courriel, paiements, clients, exig
 
   const entier = (v, min, max) => Number.isInteger(v) && v >= min && v <= max;
   const reel = (v, min, max) => v === null || v === undefined || (typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max);
+
+  // nouveau devis en file pour la découpe. lignes : [fichier_id, quantite, pos_x, pos_y, rotation, echelle]
+  function creerDevis(clientId, imp, { remp, couches, proprete_mm: propreteMm }, lignes, publicationId = null) {
+    const now = Date.now();
+    db.exec('BEGIN');
+    try {
+      const { lastInsertRowid: id } = db.prepare(`INSERT INTO devis (client_id, imprimante_id, remplissage_pct, couches_surface,
+        proprete_mm, statut, cree_le, publication_id) VALUES (?, ?, ?, ?, ?, 'attente', ?, ?)`)
+        .run(clientId, imp.id, remp, couches, propreteMm, now, publicationId);
+      const ins = db.prepare(`INSERT INTO devis_pieces (devis_id, fichier_id, quantite, pos_x_mm, pos_y_mm, rotation_deg, echelle)
+        VALUES (?, ?, ?, ?, ?, ?, ?)`);
+      for (const l of lignes) ins.run(id, ...l);
+      // un fichier utilisé dans un devis est gardé au moins 30 jours après ce devis
+      db.prepare(`UPDATE fichiers_stl SET expire_le = max(expire_le, ?) WHERE id IN (SELECT fichier_id FROM devis_pieces WHERE devis_id = ?)`)
+        .run(now + B.stlConservationJours * JOUR, id);
+      db.exec('COMMIT');
+      decoupeur.reveiller();
+      return Number(id);
+    } catch (e) {
+      db.exec('ROLLBACK');
+      throw e;
+    }
+  }
+  const devisEnCours = (clientId) => db.prepare("SELECT count(*) n FROM devis WHERE client_id = ? AND statut IN ('attente', 'decoupe')").get(clientId).n;
 
   rc.post('/devis', connecte, (req, res) => {
     const { imprimante_id: impId, reglages, pieces, ...reste } = req.body || {};
@@ -336,8 +379,7 @@ function creerBoutique({ config, db, journal, courriel, paiements, clients, exig
       return res.status(400).json({ erreur: 'reglages_invalides', detail: 'remplissage 5-100, couches de surface 2-10, propreté fine ou rapide' });
     }
     if (!Array.isArray(pieces) || !pieces.length || pieces.length > 50) return res.status(400).json({ erreur: 'pieces_invalides', detail: '1 à 50 pièces' });
-    const enCours = db.prepare("SELECT count(*) n FROM devis WHERE client_id = ? AND statut IN ('attente', 'decoupe')").get(req.client.id).n;
-    if (enCours >= DEVIS_EN_ATTENTE_MAX) {
+    if (devisEnCours(req.client.id) >= DEVIS_EN_ATTENTE_MAX) {
       return res.status(429).json({ erreur: 'trop_de_devis', detail: `${DEVIS_EN_ATTENTE_MAX} devis en cours de découpe au plus : attends qu'ils soient prêts` });
     }
     const lignes = [];
@@ -363,25 +405,9 @@ function creerBoutique({ config, db, journal, courriel, paiements, clients, exig
       }
       lignes.push([f.id, quantite, pos?.[0] ?? null, pos?.[1] ?? null, rot ?? 0, echelle]);
     }
-    const now = Date.now();
-    db.exec('BEGIN');
-    try {
-      const { lastInsertRowid: id } = db.prepare(`INSERT INTO devis (client_id, imprimante_id, remplissage_pct, couches_surface,
-        proprete_mm, statut, cree_le) VALUES (?, ?, ?, ?, ?, 'attente', ?)`).run(req.client.id, imp.id, remp, couches, PROPRETES[proprete], now);
-      const ins = db.prepare(`INSERT INTO devis_pieces (devis_id, fichier_id, quantite, pos_x_mm, pos_y_mm, rotation_deg, echelle)
-        VALUES (?, ?, ?, ?, ?, ?, ?)`);
-      for (const l of lignes) ins.run(id, ...l);
-      // un fichier utilisé dans un devis est gardé au moins 30 jours après ce devis
-      db.prepare(`UPDATE fichiers_stl SET expire_le = max(expire_le, ?) WHERE id IN (SELECT fichier_id FROM devis_pieces WHERE devis_id = ?)`)
-        .run(now + B.stlConservationJours * JOUR, id);
-      db.exec('COMMIT');
-      decoupeur.reveiller();
-      journal('client.devis', { req, cible: `${req.client.email} devis ${id}`, resultat: 'ok', detail: `${lignes.length} pièce(s)` });
-      res.status(201).json(devisComplet(db.prepare('SELECT * FROM devis WHERE id = ?').get(id)));
-    } catch (e) {
-      db.exec('ROLLBACK');
-      throw e;
-    }
+    const id = creerDevis(req.client.id, imp, { remp, couches, proprete_mm: PROPRETES[proprete] }, lignes);
+    journal('client.devis', { req, cible: `${req.client.email} devis ${id}`, resultat: 'ok', detail: `${lignes.length} pièce(s)` });
+    res.status(201).json(devisComplet(db.prepare('SELECT * FROM devis WHERE id = ?').get(id)));
   });
 
   rc.get('/devis', connecte, (req, res) => {
@@ -404,7 +430,8 @@ function creerBoutique({ config, db, journal, courriel, paiements, clients, exig
     const c = q.commandeDuDevis.get(d.id);
     if (c && c.statut !== 'abandonnee') return res.status(409).json({ erreur: 'devis_commande', detail: `commande ${c.id}` });
 
-    const fichiers = db.prepare('SELECT DISTINCT f.* FROM devis_pieces p JOIN fichiers_stl f ON f.id = p.fichier_id WHERE p.devis_id = ?').all(d.id);
+    const fichiers = db.prepare('SELECT DISTINCT f.* FROM devis_pieces p JOIN fichiers_stl f ON f.id = p.fichier_id WHERE p.devis_id = ? AND f.client_id = ?')
+      .all(d.id, d.client_id);
     db.exec('BEGIN');
     try {
       // commande jamais payée (abandonnée) : elle part avec le devis ; ses autres devis redeviennent libres
@@ -435,8 +462,7 @@ function creerBoutique({ config, db, journal, courriel, paiements, clients, exig
     const absent = db.prepare(`SELECT f.nom_origine FROM devis_pieces p JOIN fichiers_stl f ON f.id = p.fichier_id
       WHERE p.devis_id = ? AND f.chemin = '' LIMIT 1`).get(d.id);
     if (absent) return res.status(409).json({ erreur: 'fichier_indisponible', detail: absent.nom_origine });
-    const enCours = db.prepare("SELECT count(*) n FROM devis WHERE client_id = ? AND statut IN ('attente', 'decoupe')").get(req.client.id).n;
-    if (enCours >= DEVIS_EN_ATTENTE_MAX) {
+    if (devisEnCours(req.client.id) >= DEVIS_EN_ATTENTE_MAX) {
       return res.status(429).json({ erreur: 'trop_de_devis', detail: `${DEVIS_EN_ATTENTE_MAX} devis en cours de découpe au plus : attends qu'ils soient prêts` });
     }
     db.prepare("UPDATE devis SET statut = 'attente', erreur = NULL WHERE id = ?").run(d.id);
@@ -605,6 +631,144 @@ function creerBoutique({ config, db, journal, courriel, paiements, clients, exig
       devis_liste: idsDevis(c.id).map((id) => devisComplet(db.prepare('SELECT * FROM devis WHERE id = ?').get(id))) });
   });
 
+  // ------------------------------------------------ galerie des projets réalisés
+  // Un client publie un de ses projets imprimés (devis d'une commande imprimée, expédiée ou livrée), signé de son
+  // pseudo, et peut le retirer à tout moment. Les autres le voient en 3D (aperçu du gcode, jamais le STL) et le
+  // choisissent : un devis à leur nom est découpé avec les mêmes pièces et réglages, à commander comme les leurs.
+
+  const STATUTS_REALISES = ['imprimee', 'expediee', 'livree'];
+  const PUBLICATION_VISIBLE = `SELECT pu.*, c.pseudo FROM publications pu JOIN clients c ON c.id = pu.client_id
+    JOIN devis d ON d.id = pu.devis_id WHERE pu.retiree_le IS NULL AND c.actif = 1 AND c.pseudo IS NOT NULL AND d.statut = 'pret'`;
+
+  function retirerPublicationsDuFichier(fichierId) {
+    db.prepare(`UPDATE publications SET retiree_le = ? WHERE retiree_le IS NULL AND devis_id IN (
+      SELECT devis_id FROM devis_pieces WHERE fichier_id = ?)`).run(Date.now(), fichierId);
+  }
+
+  // projet vu dans la galerie : ce qu'il faut pour choisir (pièces, tailles, réglages, poids), rien de privé
+  function projetPublic(pu) {
+    const d = db.prepare('SELECT * FROM devis WHERE id = ?').get(pu.devis_id);
+    const pieces = db.prepare(`SELECT p.quantite, p.echelle, f.nom_origine, f.dim_x_mm, f.dim_y_mm, f.dim_z_mm, f.chemin
+      FROM devis_pieces p JOIN fichiers_stl f ON f.id = p.fichier_id WHERE p.devis_id = ? ORDER BY p.id`).all(d.id);
+    return { id: pu.uuid, titre: pu.titre, auteur: pu.pseudo, cree_le: pu.cree_le, choisie: pu.choisie,
+      imprimante_id: d.imprimante_id, poids_g: d.poids_g, duree_s: d.duree_s, prix_matiere_cts: d.prix_matiere_cts,
+      reglages: { remplissage_pct: d.remplissage_pct, couches_surface: d.couches_surface, proprete: d.proprete_mm === 0.2 ? 'fine' : 'rapide' },
+      disponible: pieces.every((p) => p.chemin),
+      pieces: pieces.map((p) => ({ nom: p.nom_origine.replace(/\.stl$/i, ''), quantite: p.quantite,
+        dims_mm: [p.dim_x_mm, p.dim_y_mm, p.dim_z_mm].map((v) => Math.round(v * p.echelle * 10) / 10) })) };
+  }
+  const publicationVisible = (uuid) => (uuidValide(uuid) ? db.prepare(`${PUBLICATION_VISIBLE} AND pu.uuid = ?`).get(uuid) : null);
+
+  // ouverte à tous (même sans compte) : la vitrine du site
+  rc.get('/galerie', (req, res) => {
+    res.set('Cache-Control', 'no-cache');
+    res.json(db.prepare(`${PUBLICATION_VISIBLE} ORDER BY pu.cree_le DESC LIMIT 120`).all().map(projetPublic));
+  });
+  rc.get('/galerie/:id/trajets', (req, res) => {
+    const pu = publicationVisible(String(req.params.id));
+    if (!pu) return res.status(404).json({ erreur: 'projet_inconnu' });
+    envoyerTrajets(res, pu.devis_id, 'meta');
+  });
+  rc.get('/galerie/:id/trajets-bin', (req, res) => {
+    const pu = publicationVisible(String(req.params.id));
+    if (!pu) return res.status(404).json({ erreur: 'projet_inconnu' });
+    envoyerTrajets(res, pu.devis_id, 'bin');
+  });
+
+  // choisir un projet : devis à son nom, mêmes pièces et réglages, découpé à nouveau (profil d'impression actuel)
+  rc.post('/galerie/:id/devis', connecte, (req, res) => {
+    const pu = publicationVisible(String(req.params.id));
+    if (!pu) return res.status(404).json({ erreur: 'projet_inconnu' });
+    const source = db.prepare('SELECT * FROM devis WHERE id = ?').get(pu.devis_id);
+    const imp = q.imprimante.get(source.imprimante_id);
+    if (!imp?.disponible) return res.status(409).json({ erreur: 'imprimante_indisponible' });
+    const pieces = db.prepare(`SELECT p.*, f.chemin FROM devis_pieces p JOIN fichiers_stl f ON f.id = p.fichier_id
+      WHERE p.devis_id = ? ORDER BY p.id`).all(source.id);
+    if (pieces.some((p) => !p.chemin)) return res.status(409).json({ erreur: 'projet_indisponible' });
+    if (devisEnCours(req.client.id) >= DEVIS_EN_ATTENTE_MAX) {
+      return res.status(429).json({ erreur: 'trop_de_devis', detail: `${DEVIS_EN_ATTENTE_MAX} devis en cours de découpe au plus : attends qu'ils soient prêts` });
+    }
+    const id = creerDevis(req.client.id, imp, { remp: source.remplissage_pct, couches: source.couches_surface, proprete_mm: source.proprete_mm },
+      pieces.map((p) => [p.fichier_id, p.quantite, p.pos_x_mm, p.pos_y_mm, p.rotation_deg, p.echelle]), pu.id);
+    db.prepare('UPDATE publications SET choisie = choisie + 1 WHERE id = ?').run(pu.id);
+    journal('client.galerie.choix', { req, cible: `${req.client.email} devis ${id}`, resultat: 'ok', detail: `projet ${pu.uuid}` });
+    res.status(201).json(devisComplet(db.prepare('SELECT * FROM devis WHERE id = ?').get(id)));
+  });
+
+  // ses publications (visibles ou retirées)
+  rc.get('/publications', connecte, (req, res) => {
+    res.json(db.prepare(`SELECT pu.*, d.uuid devis_uuid FROM publications pu JOIN devis d ON d.id = pu.devis_id
+      WHERE pu.client_id = ? ORDER BY pu.cree_le DESC`).all(req.client.id).map((pu) => ({ id: pu.uuid, titre: pu.titre,
+      devis_id: pu.devis_uuid, devis_ref: ref(pu.devis_uuid), cree_le: pu.cree_le, retiree_le: pu.retiree_le, choisie: pu.choisie })));
+  });
+
+  // publier un projet réalisé (ou le republier après l'avoir retiré)
+  rc.post('/devis/:id/publier', connecte, (req, res) => {
+    const { titre, ...reste } = req.body || {};
+    if (Object.keys(reste).length) return res.status(400).json({ erreur: 'champ_inconnu' });
+    if (typeof titre !== 'string' || !titre.trim() || titre.length > 60) return res.status(400).json({ erreur: 'titre_invalide', detail: '1 à 60 caractères' });
+    const d = q.devisDuClient.get(String(req.params.id), req.client.id);
+    if (!d) return res.status(404).json({ erreur: 'devis_inconnu' });
+    if (d.publication_id) return res.status(409).json({ erreur: 'projet_d_un_autre', detail: 'ce devis vient de la galerie' });
+    const c = q.commandeDuDevis.get(d.id);
+    if (d.statut !== 'pret' || !c || !STATUTS_REALISES.includes(c.statut)) return res.status(409).json({ erreur: 'pas_encore_realise' });
+    if (!req.client.pseudo) return res.status(409).json({ erreur: 'pseudo_requis' });
+    const absent = db.prepare(`SELECT 1 FROM devis_pieces p JOIN fichiers_stl f ON f.id = p.fichier_id WHERE p.devis_id = ? AND f.chemin = ''`).get(d.id);
+    if (absent) return res.status(409).json({ erreur: 'fichier_indisponible' });
+    db.prepare(`INSERT INTO publications (client_id, devis_id, titre, cree_le) VALUES (?, ?, ?, ?)
+      ON CONFLICT(devis_id) DO UPDATE SET titre = excluded.titre, retiree_le = NULL, cree_le = excluded.cree_le`)
+      .run(req.client.id, d.id, titre.trim(), Date.now());
+    journal('client.galerie.publier', { req, cible: `${req.client.email} devis ${d.id}`, resultat: 'ok' });
+    res.status(201).json(projetPublic(db.prepare(`${PUBLICATION_VISIBLE} AND pu.devis_id = ?`).get(d.id)));
+  });
+
+  rc.delete('/publications/:id', connecte, (req, res) => {
+    const n = db.prepare('UPDATE publications SET retiree_le = ? WHERE uuid = ? AND client_id = ? AND retiree_le IS NULL')
+      .run(Date.now(), String(req.params.id), req.client.id).changes;
+    if (!n) return res.status(404).json({ erreur: 'publication_inconnue' });
+    journal('client.galerie.retirer', { req, cible: req.client.email, resultat: 'ok' });
+    res.json({ ok: true });
+  });
+
+  // ------------------------------------------------ suppression du compte (droit à l'effacement)
+  // Mot de passe redemandé. Impossible pendant une commande en cours. Effacés : publications, devis non
+  // commandés, fichiers STL (disque), adresses, sessions ; le compte est anonymisé. Les commandes passées et
+  // leurs factures restent (obligation comptable), avec le nom et l'adresse de livraison qui y figurent.
+  rc.delete('/moi', connecte, asynchrone(async (req, res) => {
+    const c = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.client.id);
+    if (typeof req.body?.motdepasse !== 'string' || !(await S.verifierMdp(c.hash, req.body.motdepasse))) {
+      return res.status(401).json({ erreur: 'mot_de_passe_invalide' });
+    }
+    const enCours = db.prepare(`SELECT 1 FROM commandes WHERE client_id = ? AND statut IN (${STATUTS_EN_COURS.map(() => '?').join(',')}) LIMIT 1`)
+      .get(c.id, ...STATUTS_EN_COURS);
+    if (enCours) return res.status(409).json({ erreur: 'commande_en_cours', detail: 'attends la livraison de ta commande' });
+    const now = Date.now();
+    const libres = db.prepare('SELECT id FROM devis WHERE client_id = ? AND id NOT IN (SELECT devis_id FROM commande_devis)').all(c.id);
+    const fichiers = db.prepare("SELECT * FROM fichiers_stl WHERE client_id = ? AND chemin != ''").all(c.id);
+    db.exec('BEGIN');
+    try {
+      db.prepare('UPDATE publications SET retiree_le = ? WHERE client_id = ? AND retiree_le IS NULL').run(now, c.id);
+      for (const { id } of db.prepare("SELECT id FROM commandes WHERE client_id = ? AND statut IN ('en_attente_paiement', 'abandonnee')").all(c.id)) {
+        supprimerCommandeNonPayee(id);
+      }
+      for (const { id } of libres) db.prepare('DELETE FROM devis WHERE id = ?').run(id);
+      db.prepare('DELETE FROM adresses WHERE client_id = ?').run(c.id);
+      db.prepare('DELETE FROM jetons_email WHERE client_id = ?').run(c.id);
+      db.prepare('DELETE FROM sessions_client WHERE client_id = ?').run(c.id);
+      db.prepare(`UPDATE clients SET email = ?, nom = 'Compte supprimé', pseudo = NULL, hash = '!', actif = 0, email_verifie = 0
+        WHERE id = ?`).run(`supprime-${crypto.randomUUID()}@compte-supprime.invalid`, c.id);
+      db.exec('COMMIT');
+    } catch (e) {
+      db.exec('ROLLBACK');
+      throw e;
+    }
+    for (const { id } of libres) decoupeur.effacer(id);
+    for (const f of fichiers) effacerFichier(f);
+    journal('client.suppression_compte', { req, cible: `client ${c.id}`, resultat: 'ok', detail: `${fichiers.length} fichier(s), ${libres.length} devis` });
+    res.append('Set-Cookie', `${clients.NOM}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${config.api.cookieSecure ? '; Secure' : ''}`);
+    res.json({ ok: true });
+  }));
+
   // ================================================================ routes admin (/api/v1/boutique)
 
   const ra = express.Router();
@@ -651,6 +815,7 @@ function creerBoutique({ config, db, journal, courriel, paiements, clients, exig
       devis: devisComplet(db.prepare('SELECT * FROM devis WHERE id = ?').get(c.devis_id), { admin: true }),
       devis_liste: idsDevis(c.id).map((id) => devisComplet(db.prepare('SELECT * FROM devis WHERE id = ?').get(id), { admin: true })),
       facture: db.prepare('SELECT numero, total_cts, emise_le FROM factures WHERE commande_id = ?').get(c.id) || null,
+      plaques: plaques.deLaCommande(c.id),
       rappels: db.prepare('SELECT echeance, palier, prevu_le, envoye_le FROM rappels WHERE commande_id = ? ORDER BY prevu_le').all(c.id) });
   });
 
@@ -664,8 +829,10 @@ function creerBoutique({ config, db, journal, courriel, paiements, clients, exig
       .run(now, limite, req.user.id, c.id);
     db.prepare("DELETE FROM rappels WHERE commande_id = ? AND echeance = 'validation' AND envoye_le IS NULL").run(c.id);
     planifierRappels(c.id, 'envoi', now, limite);
-    journal('boutique.valider', { req, cible: `commande ${c.id}`, resultat: 'ok' });
-    res.json({ ok: true, envoi_limite_le: limite });
+    // ses plaques (une par devis) partent dans le dossier « a_faire » de l'imprimante
+    const creees = plaques.creerPourCommande(c.id);
+    journal('boutique.valider', { req, cible: `commande ${c.id}`, resultat: 'ok', detail: `${creees.length} plaque(s)` });
+    res.json({ ok: true, envoi_limite_le: limite, plaques: creees.map(plaques.numero) });
   });
 
   ra.post('/commandes/:id/refuser', confirme, asynchrone(async (req, res) => {
@@ -701,12 +868,8 @@ function creerBoutique({ config, db, journal, courriel, paiements, clients, exig
     res.status(n ? 200 : 409).json(n ? { ok: true } : { erreur: 'statut_incompatible' });
   });
 
-  ra.get('/lots', (req, res) => {
-    res.json(db.prepare(`SELECT l.*, (SELECT coalesce(sum(quantite), 0) FROM lot_pieces WHERE lot_id = l.id) nb_pieces,
-      (SELECT group_concat(DISTINCT c.id) FROM lot_pieces lp JOIN devis_pieces p ON p.id = lp.devis_piece_id
-        JOIN commande_devis c ON c.devis_id = p.devis_id WHERE lp.lot_id = l.id) commandes
-      FROM lots l ORDER BY l.id DESC LIMIT 200`).all().map((l) => ({ ...l, commandes: l.commandes ? l.commandes.split(',').map(Number) : [] })));
-  });
+  // plaques : liste, à valider (pop-up), valider / ratée / lancer / renvoyer
+  ra.use('/plaques', plaques.routes);
 
   ra.get('/factures', (req, res) => {
     res.json(db.prepare(`SELECT f.*, c.statut commande_statut, cl.email client_email, cl.nom client_nom
@@ -792,7 +955,8 @@ function creerBoutique({ config, db, journal, courriel, paiements, clients, exig
       decoupeur.effacer(id);
       bilan.devis_supprimes += db.prepare('DELETE FROM devis WHERE id = ?').run(id).changes;
     }
-    for (const f of db.prepare("SELECT * FROM fichiers_stl WHERE expire_le < ? AND chemin != ''").all(maintenant)) {
+    for (const f of db.prepare(`SELECT * FROM fichiers_stl WHERE expire_le < ? AND chemin != '' AND id NOT IN (
+      SELECT p.fichier_id FROM devis_pieces p JOIN publications pu ON pu.devis_id = p.devis_id WHERE pu.retiree_le IS NULL)`).all(maintenant)) {
       effacerFichier(f);
       bilan.stl_supprimes++;
     }
@@ -889,7 +1053,7 @@ function creerBoutique({ config, db, journal, courriel, paiements, clients, exig
     res.json({ recu: true });
   }
 
-  return { routesClient: rc, routesAdmin: ra, tacheHoraire, marquerPayee, planifierRappels, enregistrerStl, decoupeur, webhookStripe,
+  return { routesClient: rc, routesAdmin: ra, plaques, tacheHoraire, marquerPayee, planifierRappels, enregistrerStl, decoupeur, webhookStripe,
     emettreFacture };
 }
 

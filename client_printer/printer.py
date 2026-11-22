@@ -794,6 +794,9 @@ class Printer:
 
         return {
             "state": self.state_printer.state,
+            # état exact de Klipper : "printing", "paused", "complete", "cancelled", "error", "standby"
+            # (le serveur s'en sert pour savoir si une plaque est finie ou a été annulée)
+            "etat_klipper": stats.get("state"),
             "filename": stats.get("filename"),
             "progress_percent": progression,
             "elapsed_seconds": ecoule,
@@ -828,19 +831,23 @@ class Printer:
 
     # ----- fichiers --------------------------------------------------------
 
-    def upload_gcode(self, path, keep_on_printer=True):
+    def upload_gcode(self, path, keep_on_printer=True, nom=None):
         # stocke le gcode en local, l'envoie sur la machine pour lire le temps d'impression
         # et le poids estimés, et enregistre ces infos dans gcode_index.json.
         #
         # keep_on_printer=True  : le fichier reste sur l'imprimante -> start_print() démarre
         #                         sans le renvoyer (il est supprimé à la fin du print / à l'annulation)
         # keep_on_printer=False : supprimé tout de suite -> start_print() devra le renvoyer (lent)
+        # nom : nom à donner au fichier, avec un dossier éventuel ("a_faire/P0007.gcode") ; par défaut
+        #       le nom du fichier, à la racine
         if not os.path.isfile(path):
             return {"error": "fichier introuvable"}
 
-        os.makedirs(self.gcode_dir, exist_ok=True)
-        nom = os.path.basename(path)
-        local = os.path.join(self.gcode_dir, nom)
+        nom = nom or os.path.basename(path)
+        local = self._local_path(nom)
+        if local is None:
+            return {"error": f"nom de fichier refusé : {nom}"}
+        os.makedirs(os.path.dirname(local), exist_ok=True)
         if os.path.abspath(path) != os.path.abspath(local):
             import shutil
             shutil.copy2(path, local)
@@ -864,6 +871,46 @@ class Printer:
         if not keep_on_printer:
             self.del_file(nom)
         return entree
+
+    def move_gcode(self, source, destination):
+        # déplace / renomme un gcode connu (ex. "a_faire/P0007.gcode" -> "imprimees/P0007_..._Client.gcode") :
+        # copie locale, entrée de gcode_index.json, et le fichier sur l'imprimante s'il y est encore
+        # (après un print il n'y est plus : il est renvoyé depuis la copie locale au prochain lancement).
+        # retourne {"result": "ok", "nom": destination} ou {"error": ...}
+        from . import toolpath
+
+        if source == destination:
+            return {"result": "ok", "nom": destination}
+        entree = self.gcodes().get(source)
+        ancien = (entree or {}).get("chemin") or self._local_path(source)
+        nouveau = self._local_path(destination)
+        if not entree or not ancien or not os.path.isfile(ancien):
+            return {"error": f"{source} inconnu"}
+        if nouveau is None or not destination.lower().endswith(config.GCODE_EXTENSIONS):
+            return {"error": f"destination refusée : {destination}"}
+        if os.path.exists(nouveau) or destination in self.gcodes():
+            return {"error": f"{destination} existe déjà"}
+        en_cours = self.last_status.get("print_stats", {}).get("filename")
+        if source == en_cours and self.state_printer.state in ("PRINTING", "BREAK"):
+            return {"error": f"{source} est en cours d'impression"}
+
+        # 1) imprimante d'abord (si elle a encore le fichier) : en cas d'échec, rien n'est déplacé
+        if self._metadata(source) is not None:
+            res = req_send("POST", f"{self.base}/server/files/move",
+                           json={"source": f"gcodes/{source}", "dest": f"gcodes/{destination}"}, timeout=20)
+            if res.get("error"):
+                return {"error": f"déplacement sur l'imprimante impossible ({res['error']}) : rien n'a été déplacé"}
+
+        # 2) copie locale et index (l'aperçu 3D en cache est lié au chemin : il sera refait)
+        toolpath.forget(ancien, config.TOOLPATH_DIR)
+        os.makedirs(os.path.dirname(nouveau), exist_ok=True)
+        os.replace(ancien, nouveau)
+        with self._lock:
+            index = self._data_of("index")
+            index.pop(source, None)
+            index[destination] = {**entree, "chemin": nouveau}
+            self._changed("index", now=True)
+        return {"result": "ok", "nom": destination}
 
     def gcodes(self):
         # gcodes connus en local (envoyés avec upload_gcode() ou récupérés sur la machine) :

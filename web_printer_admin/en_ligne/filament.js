@@ -10,11 +10,22 @@ const Filament = (() => {
   // couleur venant du fichier ou de la machine : seulement un vrai code hexadécimal
   const couleurSure = (c) => (/^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(c || "") ? c.slice(0, 7) : null);
 
+  // la couleur n'est pas écrite en style="..." (refusé par la CSP du site : style-src 'self') mais dans
+  // data-couleur, puis appliquée par le DOM (autorisé) dès que la pastille apparaît dans la page
   function pastille(couleur) {
     const c = couleurSure(couleur);
-    return c ? `<span class="pastille-fil" style="background:${c}"></span>`
+    return c ? `<span class="pastille-fil" data-couleur="${c}"></span>`
       : '<span class="pastille-fil inconnue"></span>';
   }
+  const colorer = (racine) => {
+    for (const el of racine.querySelectorAll ? racine.querySelectorAll('[data-couleur]') : []) {
+      el.style.background = couleurSure(el.dataset.couleur) || '';
+      el.removeAttribute('data-couleur');
+    }
+  };
+  new MutationObserver((changes) => {
+    for (const ch of changes) for (const n of ch.addedNodes) if (n.nodeType === 1) { colorer(n.parentNode || n); break; }
+  }).observe(document.documentElement, { childList: true, subtree: true });
 
   // "PLA" et "PLA High Speed" sont compatibles ; "PLA" et "PETG" non
   function compatibles(a, b) {

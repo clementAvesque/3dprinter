@@ -25,6 +25,7 @@
     "files.sync":      {"role": "operateur", "longue": true, "params": {}},
     "file.upload":     {"role": "operateur", "longue": true, "params": {"fichier": {"type": "fichier"}, "taille": {"type": "entier", "min": 1, "max": 209715200}, "sha256": {"type": "texte", "max": 64, "motif": "^[0-9a-f]{64}$"}, "transfert": {"type": "texte", "max": 40, "motif": "^[A-Za-z0-9_-]+$"}}},
     "file.delete":     {"role": "operateur", "confirmation": true, "params": {"fichier": {"type": "fichier"}}},
+    "file.move":       {"role": "operateur", "params": {"source": {"type": "fichier"}, "destination": {"type": "fichier"}}},
     "file.thumbnail":  {"role": "lecteur", "params": {"fichier": {"type": "fichier"}}},
     "file.toolpath":   {"role": "lecteur", "delai_ms": 120000, "params": {"fichier": {"type": "fichier"}}},
 

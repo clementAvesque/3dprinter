@@ -10,6 +10,8 @@ const props = defineProps({
   plateau: { type: Array, default: () => [250, 250, 260] },     // [x, y, z] en mm
   pieces: { type: Array, default: () => [] },                    // [{ id, geometrie, dims, echelle }]
   places: { type: Array, default: () => [] },                    // [{ id, n, x, y, rot }]
+  // zones de la vue couvertes par l'interface (panneau, en-tête), en px : le plateau est centré dans le reste
+  marges: { type: Object, default: () => ({ gauche: 0, haut: 0, bas: 0 }) },
   hors: { type: Array, default: () => [] },                      // [{ id, n }]
   selection: { type: Number, default: null },                    // id de la pièce sélectionnée
 });
@@ -102,7 +104,8 @@ function surRelache(e) {
 
 function cadrer() {
   const [L, H, Z] = props.plateau;
-  const d = Math.max(L, H) * 1.45;
+  // zone visible étroite (panneau ouvert, téléphone en portrait) : on recule pour garder tout le plateau
+  const d = Math.max(L, H) * 1.45 * Math.max(1, 1.25 / (camera.aspect || 1));
   controls.target.set(L / 2, H / 2, Math.min(Z, 60) / 2);
   camera.position.set(L / 2 + d * 0.55, H / 2 - d * 0.9, d * 0.75);
   controls.update();
@@ -113,7 +116,13 @@ function redimensionner() {
   const l = conteneur.value.clientWidth, h = conteneur.value.clientHeight;
   if (!l || !h) return;
   renderer.setSize(l, h);
-  camera.aspect = l / h;
+  // vue « virtuelle » limitée à la partie visible : le centre du plateau tombe au centre de ce qui est libre
+  const { gauche = 0, haut = 0, bas = 0 } = props.marges || {};
+  const lv = Math.max(l - gauche, l * 0.3), hv = Math.max(h - haut - bas, h * 0.3);
+  camera.aspect = lv / hv;
+  // la zone libre commence à (l - lv, min(haut, h - hv)) dans le canvas : le canvas démarre donc à l'opposé
+  if (gauche || haut || bas) camera.setViewOffset(lv, hv, -(l - lv), -Math.min(haut, h - hv), l, h);
+  else camera.clearViewOffset();
   camera.updateProjectionMatrix();
   rendu();
 }
@@ -152,6 +161,8 @@ onBeforeUnmount(() => {
 });
 
 watch(() => props.plateau.join('x'), () => { construirePlateau(); cadrer(); construirePieces(); });
+// panneau replié ou déplié : la zone visible change, le plateau est recadré dedans
+watch(() => props.marges, () => { redimensionner(); cadrer(); }, { deep: true });
 watch(() => [props.places, props.hors, props.pieces, props.selection], construirePieces, { deep: true });
 defineExpose({ cadrer });
 </script>

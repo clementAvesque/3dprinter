@@ -187,13 +187,63 @@
 
 </main>
 
-<!-- pièce choisie : lancement -->
-<div id="panneau" class="panneau-impression" hidden>
-  <span id="choix-nom" class="grow fichier-en-cours"></span>
-  <span id="choix-infos" class="muted small"></span>
-  <select id="emplacement" title="emplacement de l'ACE"></select>
-  <button id="btn-imprimer" class="primaire">Imprimer</button>
-</div>
+<!-- gcode choisi : aperçu 3D, plastique, lancement, suppression -->
+<dialog id="fiche" class="fiche">
+  <div class="fiche-tete">
+    <h2 id="choix-nom" class="titre-fichier"></h2>
+    <button id="fiche-fermer" class="fantome" aria-label="Fermer">✕</button>
+  </div>
+  <div class="fiche-corps">
+    <div class="vue3d" id="fiche-vue">
+      <div class="outils">
+        <button class="fantome" data-vue="iso">3D</button>
+        <button class="fantome" data-vue="dessus">Dessus</button>
+        <button class="fantome" data-vue="face">Face</button>
+      </div>
+      <div id="fiche-message" class="vue-message muted"></div>
+      <div class="curseur-couche">
+        <span class="muted small">Couche</span>
+        <input id="fiche-couche" type="range" min="0" max="0" value="0" disabled>
+        <b id="fiche-couche-txt" class="mono">—</b>
+      </div>
+    </div>
+    <div class="fiche-infos">
+      <div class="stats">
+        <div>Durée estimée<b id="fiche-temps">—</b></div>
+        <div>Filament<b id="fiche-poids">—</b></div>
+        <div>Fichier<b id="fiche-taille">—</b></div>
+        <div>Couches<b id="fiche-couches">—</b></div>
+      </div>
+      <div class="fil-bloc">
+        <span class="muted small">Plastique prévu par le fichier</span>
+        <div id="fiche-fil" class="fil-liste"></div>
+      </div>
+      <label class="fil-bloc">
+        <span class="muted small">Plastique à utiliser (emplacement de l'ACE)</span>
+        <select id="emplacement"></select>
+      </label>
+      <p id="fiche-conseil" class="small conseil" hidden></p>
+      <p id="fiche-occupee" class="small conseil alerte" hidden>L'imprimante est déjà en train d'imprimer.</p>
+      <button id="btn-imprimer" class="primaire">Imprimer</button>
+      <a id="fiche-suivi" class="lien" href="suivi.html">Ouvrir dans Suivi 3D →</a>
+      <button id="fiche-supprimer" class="danger supprimer">Supprimer ce gcode</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- confirmation de suppression -->
+<dialog id="suppression">
+  <form method="dialog">
+    <h2>Supprimer ce gcode ?</h2>
+    <p id="suppr-nom" class="mono small"></p>
+    <p class="muted small">Il est supprimé de l'imprimante et du Raspberry, avec sa miniature et son aperçu 3D.
+      C'est définitif. L'historique des impressions, lui, est conservé.</p>
+    <div class="row fin">
+      <button value="non" class="fantome">Annuler</button>
+      <button value="oui" id="suppr-ok" class="danger plein">Supprimer</button>
+    </div>
+  </form>
+</dialog>
 
 <!-- confirmation 2FA (actions sensibles) -->
 <dialog id="confirmation">
@@ -212,6 +262,7 @@
 <div id="toasts" class="toasts"></div>
 <script src="config.js"></script>
 <script src="commun.js"></script>
+<script src="filament.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

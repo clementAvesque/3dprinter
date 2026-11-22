@@ -353,3 +353,47 @@ dialog.fiche { width: min(1100px, calc(100vw - 32px)); max-width: none; max-heig
 .liste-pieces li.devis-commande ul { margin: 4px 0 0; padding-left: 18px; }
 .liste-pieces li.devis-commande li { display: list-item; }
 dialog select, dialog input:not(.code) { width: 100%; }
+
+/* ----- plaques : pop-up « impression finie, je valide ? » (commun.js) ----- */
+dialog.plaque-valider { width: min(520px, calc(100vw - 32px)); display: flex; flex-direction: column; gap: 14px; }
+dialog.plaque-valider:not([open]) { display: none; }
+dialog.plaque-valider h2 { margin: 0; }
+dialog.plaque-valider p { margin: 0; }
+.plaque-corps { display: flex; flex-direction: column; gap: 10px; max-height: 55vh; overflow: auto; }
+.tri { display: flex; flex-direction: column; gap: 8px; }
+.tri-bloc { padding: 10px 12px; background: var(--input); border: 1px solid var(--border); border-radius: 10px; }
+.tri-bloc ul { margin: 6px 0 0; padding-left: 18px; font-size: 13px; }
+.plaque-actions { justify-content: flex-end; }
+.actions-plaque { white-space: nowrap; }
+.actions-plaque button + button { margin-left: 6px; }
+
+/* ----- fichiers rangés par dossier (a_faire, imprimees) ----- */
+.groupe-fichiers { grid-column: 1 / -1; margin: 6px 0 -4px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.groupe-fichiers:first-child { margin-top: 0; }
+
+/* ----- bon de colis (bon.html) ----- */
+.bon-outils { display: flex; align-items: center; gap: 10px; max-width: 800px; margin: 0 auto; padding: 16px; }
+.bon { max-width: 800px; margin: 0 auto 40px; padding: 28px 32px; background: #fff; color: #111; border: 1px solid var(--border); border-radius: var(--radius); }
+.bon .muted { color: #555; }
+.bon-tete { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; border-bottom: 2px solid #111; padding-bottom: 12px; }
+.bon-tete h1 { margin: 0 0 4px; font-size: 26px; }
+.bon-tete p { margin: 0; }
+.bon-ref { font: 700 24px/1 ui-monospace, Consolas, monospace; letter-spacing: 2px; padding: 8px 12px; border: 2px solid #111; border-radius: 8px; }
+.bon-bloc { margin-top: 20px; }
+.bon-bloc h2 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: #555; }
+.bon-bloc h3 { margin: 12px 0 4px; font-size: 14px; }
+.bon-adresse { font-size: 20px; line-height: 1.35; font-weight: 600; }
+.bon-pieces { list-style: none; margin: 0; padding: 0; }
+.bon-pieces li { display: grid; grid-template-columns: 18px auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid #ddd; overflow-wrap: anywhere; }
+.bon-pieces .case { width: 14px; height: 14px; border: 1.5px solid #111; border-radius: 3px; }
+.bon-pied { margin-top: 28px; padding-top: 10px; border-top: 1px solid #ddd; }
+@media (max-width: 600px) {
+  .bon { padding: 18px 16px; border-radius: 0; border-left: 0; border-right: 0; }
+  .bon-pieces li { grid-template-columns: 18px auto minmax(0, 1fr); }
+  .bon-pieces li > :last-child { grid-column: 3; }
+}
+@media print {
+  body.page-bon { background: #fff; }
+  .bon-outils, .toasts, dialog { display: none !important; }
+  .bon { border: 0; margin: 0; padding: 0; max-width: none; }
+}

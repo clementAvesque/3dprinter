@@ -549,3 +549,97 @@ test('tâche horaire : rappels dus envoyés aux admins, STL expirés supprimés,
   assert.ok(srv.db.prepare("SELECT chemin FROM fichiers_stl WHERE uuid = ?").get(fichierId).chemin);
   assert.equal(srv.db.prepare("SELECT count(*) n FROM fichiers_stl WHERE nom_origine = 'gros.stl'").get().n, 0);
 });
+
+// ------------------------------------------------------------------ galerie et compte
+
+// compte vérifié créé directement en base (l'inscription est limitée à 10 par heure et par adresse IP)
+async function clientDirect(email) {
+  srv.db.prepare('INSERT INTO clients (email, hash, nom, email_verifie, actif, cree_le) VALUES (?, ?, ?, 1, 1, ?)')
+    .run(email, await S.hacher('un-mot-de-passe-solide'), 'Test', Date.now());
+  const c = new Client();
+  const r = await c.req('POST', '/connexion', { email, motdepasse: 'un-mot-de-passe-solide' });
+  assert.equal(r.statut, 200, JSON.stringify(r.json));
+  c.csrf = r.json.csrf;
+  return c;
+}
+
+test('galerie : l\'auteur publie un projet imprimé sous un pseudo, un autre client le choisit (devis à son nom, STL jamais exposé)', async () => {
+  const auteur = await clientDirect('auteur@test.local');
+  const reglages = { remplissage_pct: 20, couches_surface: 4, proprete: 'fine' };
+  const f = await auteur.req('POST', '/fichiers', envoiStl('support-velo.stl', cube(15)));
+  const d = await devisDecoupe(auteur, (await auteur.req('POST', '/devis', { imprimante_id: 'kobra-1', reglages,
+    pieces: [{ fichier_id: f.json.id, quantite: 3 }] })).json.id);
+  assert.equal(d.statut, 'pret', d.erreur);
+  const publier = (titre = 'Support de vélo') => auteur.req('POST', `/devis/${d.id}/publier`, { titre });
+
+  assert.equal((await publier()).json.erreur, 'pas_encore_realise', 'pas encore commandé ni imprimé');
+  const auteurId = srv.db.prepare("SELECT id FROM clients WHERE email = 'auteur@test.local'").get().id;
+  const cmd = srv.db.prepare(`INSERT INTO commandes (client_id, devis_id, statut, livraison_nom, livraison_adresse, sous_total_cts,
+    livraison_cts, total_cts, cree_le) VALUES (?, ?, 'imprimee', 'Auteur', '{}', 1, 1, 2, ?)`).run(auteurId, interne('devis', d.id), Date.now()).lastInsertRowid;
+  assert.equal((await publier()).json.erreur, 'pseudo_requis');
+
+  // pseudo : unique (sans tenir compte des majuscules), format contrôlé
+  assert.equal((await auteur.req('PATCH', '/moi', { pseudo: '<b>x' })).json.erreur, 'pseudo_invalide');
+  const p = await auteur.req('PATCH', '/moi', { pseudo: 'Clem_3D', nom: 'Clément Auteur' });
+  assert.equal(p.statut, 200, JSON.stringify(p.json));
+  assert.equal(p.json.client.pseudo, 'Clem_3D');
+  const autre = await clientDirect('acheteur@test.local');
+  assert.equal((await autre.req('PATCH', '/moi', { pseudo: 'clem_3d' })).json.erreur, 'pseudo_pris');
+
+  const pub = await publier();
+  assert.equal(pub.statut, 201, JSON.stringify(pub.json));
+  assert.equal(pub.json.auteur, 'Clem_3D');
+  assert.equal((await auteur.req('PATCH', '/moi', { pseudo: null })).json.erreur, 'pseudo_requis', 'un projet publié reste signé');
+  assert.equal((await auteur.req('GET', `/devis/${d.id}`)).json.publication.titre, 'Support de vélo');
+
+  // vitrine ouverte à tous : pseudo, pièces, aperçu 3D ; ni e-mail, ni nom, ni fichier
+  const visiteur = new Client();
+  const g = await visiteur.req('GET', '/galerie');
+  const projet = g.json.find((x) => x.id === pub.json.id);
+  assert.deepEqual(projet.pieces, [{ nom: 'support-velo', quantite: 3, dims_mm: [15, 15, 15] }]);
+  assert.doesNotMatch(JSON.stringify(g.json), /auteur@test|Clément|fichier_id|stl\//);
+  assert.equal((await visiteur.req('GET', `/galerie/${projet.id}/trajets`)).statut, 200);
+  assert.equal((await visiteur.req('POST', `/galerie/${projet.id}/devis`, {})).statut, 401, 'choisir demande un compte');
+
+  // choisi par un autre client : devis à son nom, mêmes pièces et réglages, redécoupé
+  const choix = await autre.req('POST', `/galerie/${projet.id}/devis`, {});
+  assert.equal(choix.statut, 201, JSON.stringify(choix.json));
+  assert.deepEqual(choix.json.galerie, { id: projet.id, titre: 'Support de vélo', auteur: 'Clem_3D' });
+  assert.equal(choix.json.pieces[0].fichier_id, null, 'le fichier de l\'auteur n\'est pas exposé');
+  assert.equal(choix.json.pieces[0].quantite, 3);
+  assert.equal(choix.json.reglages.remplissage_pct, 20);
+  assert.equal((await devisDecoupe(autre, choix.json.id)).statut, 'pret');
+  assert.equal((await autre.req('GET', `/fichiers/${f.json.id}`)).statut, 404, 'STL de l\'auteur jamais téléchargeable');
+  assert.equal((await autre.req('GET', '/fichiers')).json.length, 0);
+  assert.equal((await visiteur.req('GET', '/galerie')).json.find((x) => x.id === projet.id).choisie, 1);
+  assert.equal((await autre.req('POST', `/devis/${choix.json.id}/publier`, { titre: 'à moi' })).statut, 409, 'on ne republie pas le projet d\'un autre');
+  // l'acheteur supprime son devis : le fichier de l'auteur reste
+  assert.equal((await autre.req('DELETE', `/devis/${choix.json.id}`)).statut, 200);
+  const disque = path.join(srv.config.donnees, srv.db.prepare('SELECT chemin FROM fichiers_stl WHERE uuid = ?').get(f.json.id).chemin);
+  assert.ok(fs.existsSync(disque));
+
+  // un projet publié n'expire pas avec la tâche horaire
+  await srv.app.locals.boutique.tacheHoraire(Date.now() + 3 * 365 * JOUR);
+  assert.ok(fs.existsSync(disque), 'fichier d\'un projet publié gardé');
+
+  // retiré par son auteur : plus visible
+  assert.equal((await auteur.req('GET', '/publications')).json[0].choisie, 1);
+  assert.equal((await auteur.req('DELETE', `/publications/${projet.id}`)).statut, 200);
+  assert.ok(!(await visiteur.req('GET', '/galerie')).json.some((x) => x.id === projet.id));
+  assert.equal((await visiteur.req('GET', `/galerie/${projet.id}/trajets`)).statut, 404);
+
+  // suppression du compte : mot de passe, pas de commande en cours, puis tout est effacé sauf la commande
+  assert.equal((await auteur.req('DELETE', '/moi', { motdepasse: 'mauvais' })).statut, 401);
+  assert.equal((await auteur.req('DELETE', '/moi', { motdepasse: 'un-mot-de-passe-solide' })).json.erreur, 'commande_en_cours');
+  srv.db.prepare("UPDATE commandes SET statut = 'livree' WHERE id = ?").run(cmd);
+  assert.equal((await auteur.req('DELETE', '/moi', { motdepasse: 'un-mot-de-passe-solide' })).statut, 200);
+  assert.equal((await auteur.req('GET', '/moi')).statut, 401, 'session fermée');
+  const relog = await new Client().req('POST', '/connexion', { email: 'auteur@test.local', motdepasse: 'un-mot-de-passe-solide' });
+  assert.equal(relog.statut, 401);
+  assert.ok(!fs.existsSync(disque), 'STL effacé du disque');
+  const c = srv.db.prepare('SELECT * FROM clients WHERE id = ?').get(auteurId);
+  assert.equal(c.nom, 'Compte supprimé');
+  assert.equal(c.actif, 0);
+  assert.equal(c.pseudo, null);
+  assert.ok(srv.db.prepare('SELECT 1 FROM commandes WHERE id = ?').get(cmd), 'commande gardée (comptabilité)');
+});

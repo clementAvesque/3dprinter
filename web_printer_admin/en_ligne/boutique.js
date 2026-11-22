@@ -1,5 +1,5 @@
-// Page Boutique (admin) : commandes des clients (valider, refuser = rembourser, expédier), lots, factures
-// et clients. Données : /api/v1/boutique (comptes admin seulement).
+// Page Boutique (admin) : commandes des clients (valider, refuser = rembourser, expédier, bon de colis),
+// plaques à imprimer, factures et clients. Données : /api/v1/boutique (comptes admin seulement).
 // Une commande payée n'apporte que du gcode, découpé par le serveur (OrcaSlicer) : jamais de fichier
 // envoyé par le navigateur d'un client.
 
@@ -7,9 +7,13 @@ import { Apercu3D } from './apercu3d.js';
 
 const STATUTS = {
   en_attente_paiement: ['attente paiement', ''], abandonnee: ['abandonnée', ''], payee: ['à valider', 'warn'],
-  validee: ['validée', 'accent'], dans_un_lot: ['dans un lot', 'accent'], en_impression: ['en impression', 'accent'],
-  suspendue: ['suspendue', 'warn'], imprimee: ['à expédier', 'ok'], expediee: ['expédiée', 'ok'], livree: ['livrée', 'ok'],
-  remboursee: ['remboursée', 'danger'],
+  validee: ['validée · envoi à l\'imprimante', 'accent'], dans_un_lot: ['en attente d\'impression', 'accent'],
+  en_impression: ['en cours d\'impression', 'accent'], suspendue: ['suspendue', 'warn'], imprimee: ['imprimée · à expédier', 'ok'],
+  expediee: ['envoyée', 'ok'], livree: ['livrée', 'ok'], remboursee: ['remboursée', 'danger'],
+};
+const STATUTS_PLAQUE = {
+  a_envoyer: ['à envoyer à l\'imprimante', 'warn'], a_faire: ['à faire', 'accent'], en_impression: ['en cours d\'impression', 'accent'],
+  imprimee: ['imprimée · à valider', 'warn'], validee: ['validée', 'ok'], annulee: ['annulée', ''],
 };
 const PROPRETES = { fine: 'Fine 0,2 mm + lissage', rapide: 'Rapide 0,28 mm' };
 const euros = (cts) => (cts == null ? '—' : `${(cts / 100).toFixed(2).replace('.', ',')} €`);
@@ -41,7 +45,7 @@ async function chargerResume() {
 
 // ---------------------------------------------------------------- onglets
 
-const chargeurs = { commandes: chargerCommandes, lots: chargerLots, factures: chargerFactures, clients: chargerClients };
+const chargeurs = { commandes: chargerCommandes, plaques: chargerPlaques, factures: chargerFactures, clients: chargerClients };
 let onglet = 'commandes';
 document.querySelectorAll('[data-onglet]').forEach((b) => b.addEventListener('click', () => {
   onglet = b.dataset.onglet;
@@ -139,7 +143,9 @@ async function ouvrirCommande(id) {
     li.append(titre, pieces);
     ul.appendChild(li);
   }
-  $('c-decoupe').textContent = liste.length > 1 ? `Commande groupée : ${liste.length} devis, ${liste.length} plateaux, une seule livraison.` : '';
+  const plaquesTxt = (c.plaques || []).map((p) => `${p.numero} (${(STATUTS_PLAQUE[p.statut] || [p.statut])[0]})`).join(', ');
+  $('c-decoupe').textContent = [liste.length > 1 ? `Commande groupée : ${liste.length} devis, ${liste.length} plateaux, une seule livraison.` : '',
+    plaquesTxt ? `Plaques : ${plaquesTxt}.` : ''].filter(Boolean).join(' ');
   $('c-gcode').hidden = true;      // un lien par devis, dans la liste
   $('c-motif').hidden = !c.motif_refus;
   $('c-motif').textContent = c.motif_refus ? `Motif : ${c.motif_refus}` : '';
@@ -162,6 +168,10 @@ function actions(c) {
   if (['payee', 'validee', 'suspendue'].includes(c.statut)) bouton('Refuser et rembourser', 'danger', () => refuser(c));
   if (c.statut === 'imprimee') bouton('Expédiée…', 'primaire', () => expedier(c));
   if (c.statut === 'expediee') bouton('Livrée', 'fantome', () => agir(`/commandes/${c.id}/livree`, 'Commande livrée'));
+  // bon de colis : page à imprimer et à glisser dans le colis (adresse, pièces, plaques)
+  if (!['en_attente_paiement', 'abandonnee', 'remboursee'].includes(c.statut)) {
+    bouton('Bon de colis', 'fantome', () => { window.open(`bon.html?commande=${encodeURIComponent(c.id)}`, '_blank', 'noopener'); });
+  }
 }
 
 async function agir(chemin, message, corps = {}) {
@@ -224,14 +234,44 @@ async function voirGcode(c, devisId) {
   }
 }
 
-// ---------------------------------------------------------------- lots, factures, clients
+// ---------------------------------------------------------------- plaques, factures, clients
 
-async function chargerLots() {
-  const r = await api('GET', B('/lots'));
+async function chargerPlaques() {
+  const r = await api('GET', B('/plaques'));
   if (!r.ok) return toast(texteErreur(r.json), true);
-  remplir('t-lots', r.json.map((l) => ligne([`<td>${l.id}</td>`, `<td>${echapper(l.imprimante_id)}</td>`,
-    `<td>${l.proprete_mm === 0.2 ? 'Fine' : 'Rapide'}</td>`, `<td>${l.nb_pieces}</td>`, `<td>${l.commandes.join(', ') || '—'}</td>`,
-    `<td>${echapper(l.statut)}</td>`, `<td>${date(l.cree_le)}</td>`])), 'Aucun lot pour l\'instant.', 7);
+  remplir('t-plaques', r.json.map((p) => {
+    const [txt, ton] = STATUTS_PLAQUE[p.statut] || [p.statut, ''];
+    const contenu = p.contenu.map((c) => `<b>${echapper(c.ref)}</b> · ${echapper(c.client_nom)}<br><span class="muted small">`
+      + `${c.pieces.map((pc) => `${echapper(pc.nom)} × ${pc.quantite}`).join(', ')}</span>`).join('<br>') || '—';
+    const tr = ligne([`<td><b>${echapper(p.numero)}</b>${p.tentatives > 1 ? `<br><span class="muted small">${p.tentatives} essais</span>` : ''}</td>`,
+      `<td class="nom">${contenu}</td>`, `<td class="small">${echapper(p.fichier || '—')}</td>`,
+      `<td><span class="statut ${ton}">${txt}</span>${p.erreur ? `<br><span class="small statut danger">${echapper(p.erreur)}</span>` : ''}</td>`,
+      `<td>${duree(p.duree_s)}</td>`, '<td class="actions-plaque"></td>']);
+    const zone = tr.querySelector('.actions-plaque');
+    const bouton = (texte, classe, fn) => {
+      const b = document.createElement('button');
+      b.textContent = texte;
+      b.className = classe;
+      b.onclick = async () => { b.disabled = true; await fn(); b.disabled = false; };
+      zone.appendChild(b);
+    };
+    if (p.statut === 'a_faire') {
+      bouton('Lancer', 'primaire', () => agirPlaque(p, 'lancer', `Plaque ${p.numero} lancée`));
+      if (p.machine_occupee) zone.lastChild.title = 'l\'imprimante est déjà en train d\'imprimer';
+    }
+    if (p.statut === 'a_envoyer') bouton('Renvoyer', 'fantome', () => agirPlaque(p, 'renvoyer', `Plaque ${p.numero} : envoi relancé`));
+    if (p.statut === 'imprimee') bouton('Valider…', 'primaire', async () => Plaques.montrer(p));
+    return tr;
+  }), 'Aucune plaque : elles sont créées quand tu valides une commande.', 6);
+}
+
+document.addEventListener('plaques-changees', () => { if (onglet === 'plaques') chargerPlaques(); chargerResume(); });
+
+async function agirPlaque(p, action, message) {
+  const r = await api('POST', B(`/plaques/${p.id}/${action}`), {});
+  if (!r.ok) { toast(texteErreur(r.json), true); return; }
+  toast(message);
+  await chargerPlaques();
 }
 
 async function chargerFactures() {

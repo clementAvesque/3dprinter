@@ -103,6 +103,8 @@ async function supprimer() {
     <p v-if="erreur" class="erreur">{{ erreur }}</p>
     <template v-if="devis">
       <h1>Devis {{ devis.ref }}</h1>
+      <p v-if="devis.galerie" class="discret origine-galerie">D'après le projet « {{ devis.galerie.titre }} » de <b>{{ devis.galerie.auteur }}</b>
+        (galerie des projets réalisés).</p>
       <div class="carte statut" :class="devis.statut">
         <b>{{ statut[0] }}</b>
         <span v-if="statut[1]">{{ statut[1] }}</span>

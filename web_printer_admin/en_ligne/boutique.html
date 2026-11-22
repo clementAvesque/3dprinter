@@ -45,7 +45,7 @@
 
   <div class="segments onglets-boutique" role="tablist">
     <button role="tab" data-onglet="commandes" class="actif">Commandes</button>
-    <button role="tab" data-onglet="lots">Lots</button>
+    <button role="tab" data-onglet="plaques">Plaques</button>
     <button role="tab" data-onglet="factures">Factures</button>
     <button role="tab" data-onglet="clients">Clients</button>
   </div>
@@ -71,12 +71,13 @@
     </div>
   </section>
 
-  <section id="o-lots" class="card" hidden>
-    <p class="muted small">Regroupement des commandes sur un plateau : arrive avec la découpe Orca (étape 6).</p>
+  <section id="o-plaques" class="card" hidden>
+    <p class="muted small">Une plaque par devis, créée quand tu valides la commande et envoyée dans le dossier
+      « a_faire » de l'imprimante. Finie, elle attend ta validation (pop-up), puis passe dans « imprimees ».</p>
     <div class="tableau">
       <table>
-        <thead><tr><th>Lot</th><th>Imprimante</th><th>Propreté</th><th>Pièces</th><th>Commandes</th><th>Statut</th><th>Créé</th></tr></thead>
-        <tbody id="t-lots"></tbody>
+        <thead><tr><th>Plaque</th><th>Contenu (à trier)</th><th>Fichier</th><th>Statut</th><th>Durée</th><th></th></tr></thead>
+        <tbody id="t-plaques"></tbody>
       </table>
     </div>
   </section>

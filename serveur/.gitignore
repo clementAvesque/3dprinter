@@ -1,7 +1,0 @@
-node_modules/
-# secrets et données : jamais dans git
-pki/
-data/
-config.json
-.env
-data-dev/

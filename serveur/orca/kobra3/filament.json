@@ -18,7 +18,7 @@
     "0"
   ],
   "close_fan_the_first_x_layers": [
-    "1"
+    "2"
   ],
   "compatible_printers_condition": "",
   "compatible_prints": [],
@@ -54,10 +54,10 @@
     "80"
   ],
   "fan_max_speed": [
-    "80"
+    "100"
   ],
   "fan_min_speed": [
-    "60"
+    "100"
   ],
   "filament_cooling_final_speed": [
     "0"
@@ -84,7 +84,7 @@
     "; filament end gcode\n"
   ],
   "filament_flow_ratio": [
-    "0.96"
+    "1.02"
   ],
   "filament_is_support": [
     "0"
@@ -102,7 +102,7 @@
     "nil"
   ],
   "filament_max_volumetric_speed": [
-    "12"
+    "28"
   ],
   "filament_minimal_purge_on_wipe_tower": [
     "15"
@@ -192,7 +192,7 @@
     "nil"
   ],
   "full_fan_speed_layer": [
-    "0"
+    "3"
   ],
   "hot_plate_temp": [
     "60"
@@ -204,13 +204,13 @@
     "0"
   ],
   "nozzle_temperature": [
-    "210"
+    "240"
   ],
   "nozzle_temperature_initial_layer": [
-    "220"
+    "240"
   ],
   "nozzle_temperature_range_high": [
-    "230"
+    "250"
   ],
   "nozzle_temperature_range_low": [
     "190"

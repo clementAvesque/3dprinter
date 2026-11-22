@@ -65,11 +65,15 @@ input:not([type=range]) { width: 100%; padding: 10px 12px; border-radius: 10px; 
 .entete { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 16px; padding: 10px 20px;
   background: var(--fond-carte); border-bottom: 1px solid var(--bord); }
 .marque { display: flex; align-items: center; gap: 10px; color: var(--texte); text-decoration: none; font-weight: 700; font-size: 17px; }
-.entete nav { display: flex; gap: 6px; margin-left: auto; }
-.entete nav a { color: var(--discret); text-decoration: none; padding: 6px 10px; border-radius: 8px; }
-.entete nav a:hover, .entete nav a.router-link-active { color: var(--texte); background: var(--fond-champ); }
-.actions-entete { display: flex; gap: 8px; }
-.actions-entete:empty { display: none; }
+.entete nav { display: flex; gap: 6px; }
+.actions-entete { display: flex; gap: 8px; margin-left: auto; }
+.actions-entete:empty + nav { margin-left: auto; }
+/* espace compte : bouton à côté de « Découper » */
+.bouton-compte { display: flex; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 10px; border: 1px solid var(--bord-fort);
+  background: var(--fond-carte); color: var(--texte); text-decoration: none; font-weight: 500; white-space: nowrap; }
+.bouton-compte:hover, .bouton-compte.router-link-active { border-color: var(--accent); color: var(--accent); }
+/* atelier : en-tête posée sur le plateau 3D */
+.entete.flottante { background: color-mix(in srgb, var(--fond-carte) 82%, transparent); backdrop-filter: blur(10px); }
 .pied { display: flex; flex-wrap: wrap; justify-content: center; gap: 18px; padding: 18px; font-size: 13px; }
 .pied a { color: var(--discret); text-decoration: none; }
 .pied a:hover { color: var(--texte); }
@@ -100,5 +104,6 @@ input:not([type=range]) { width: 100%; padding: 10px 12px; border-radius: 10px; 
 
 @media (max-width: 560px) {
   .entete { padding: 10px 16px; gap: 10px; }
-  .marque span { display: none; }
+  .marque span, .bouton-compte span { display: none; }
+  .bouton-compte { padding: 9px 11px; }
 }

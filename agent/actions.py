@@ -132,6 +132,9 @@ class Machine:
         if action == "files.sync":
             r = pr.sync_printer_files()
             return _res(r) if isinstance(r, dict) else {"ok": True, "resultat": {"fichiers": len(r)}}
+        if action == "file.move":
+            # rangement d'une plaque imprimée : « a_faire/... » -> « imprimees/... »
+            return _res(self.printer.move_gcode(p["source"], p["destination"]))
         if action == "file.delete":
             return _res(pr.delete_gcode(p["fichier"]))
         if action == "file.thumbnail":
@@ -213,7 +216,8 @@ class Machine:
                                    "date": os.path.getmtime(chemin), "en_cours": nom == en_cours})
         return sorted(videos, key=lambda v: v["date"], reverse=True)
 
-    def recevoir_gcode(self, chemin_tmp):
-        """Range un gcode reçu du serveur (déjà vérifié : taille et SHA-256) comme upload_gcode().
+    def recevoir_gcode(self, chemin_tmp, nom=None):
+        """Range un gcode reçu du serveur (déjà vérifié : taille et SHA-256) comme upload_gcode(),
+        sous le nom demandé (dossier compris : « a_faire/P0007_2026-11-22.gcode » pour une plaque).
         Sans le verrou : l'envoi vers l'imprimante est long et ne doit pas bloquer l'état."""
-        return _res(self.printer.upload_gcode(chemin_tmp))
+        return _res(self.printer.upload_gcode(chemin_tmp, nom=nom))

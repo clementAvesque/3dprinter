@@ -1,6 +1,0 @@
-# clés et certificats de l'agent : jamais dans git
-secrets/
-config.json
-tmp/
-agent.log
-__pycache__/

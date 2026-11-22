@@ -38,8 +38,8 @@ const operations = new Map();  // id -> libellé (pour annoncer leur résultat)
 async function choisirMachine(id) {
   machine = id;
   try { sessionStorage.setItem('machine', id); } catch { /* navigation privée */ }
+  if ($('fiche').open) $('fiche').close();
   choisi = null;
-  $('panneau').hidden = true;
   arreterDirect();
   const m = await api('GET', `/machines/${encodeURIComponent(id)}`);
   if (m.ok) afficherEtat(m.json.etat, m.json.enLigne);
@@ -110,8 +110,8 @@ function afficherEtat(e, enLigne) {
   $('btn-pause').disabled = e.state !== 'PRINTING';
   $('btn-reprise').disabled = e.state !== 'BREAK';
   $('btn-annuler').disabled = !imprime;
-  $('btn-imprimer').disabled = e.state !== 'READY';
   remplirEmplacements(e.ace?.fils);
+  majOccupation();
   afficherReglages(e, imprime);
 }
 
@@ -237,7 +237,24 @@ function afficherFichiers() {
   const zone = $('cartes');
   zone.replaceChildren();
   if (!liste.length) { zone.textContent = fichiers.length ? 'Aucun fichier ne correspond.' : 'Aucun gcode : envoies-en un.'; return; }
-  for (const f of liste) {
+  // rangés par dossier : plaques à faire d'abord (commandes validées), puis les autres, puis les plaques imprimées
+  const DOSSIERS = [['a_faire', 'Plaques à faire'], ['', 'Autres fichiers'], ['imprimees', 'Plaques imprimées']];
+  const dossierDe = (nom) => (nom.includes('/') ? nom.slice(0, nom.indexOf('/')) : '');
+  const connus = new Set(DOSSIERS.map(([d]) => d));
+  const groupes = [...DOSSIERS, ...[...new Set(liste.map((f) => dossierDe(f.nom)))].filter((d) => !connus.has(d)).map((d) => [d, d])];
+  for (const [dossier, titre] of groupes) {
+    const dedans = liste.filter((f) => dossierDe(f.nom) === dossier);
+    if (!dedans.length) continue;
+    const entete = document.createElement('h3');
+    entete.className = 'groupe-fichiers';
+    entete.textContent = `${titre} (${dedans.length})`;
+    zone.appendChild(entete);
+    for (const f of dedans) zone.appendChild(carteFichier(f));
+  }
+}
+
+function carteFichier(f) {
+  {
     const carte = document.createElement('button');
     carte.type = 'button';
     carte.className = `carte${f.nom === choisi ? ' choisie' : ''}`;
@@ -258,7 +275,7 @@ function afficherFichiers() {
     corps.className = 'corps';
     const nom = document.createElement('span');
     nom.className = 'nom';
-    nom.textContent = f.nom;                       // jamais interprété comme du HTML
+    nom.textContent = f.nom.split('/').pop();      // nom sans le dossier (en titre de section) ; jamais du HTML
     const infos = document.createElement('span');
     infos.className = 'muted small';
     const couleur = couleurSure(f.filament?.couleurs?.[0]);
@@ -273,17 +290,113 @@ function afficherFichiers() {
     corps.append(nom, infos);
     carte.append(vignette, corps);
     carte.addEventListener('click', () => choisir(f));
-    zone.appendChild(carte);
+    return carte;
   }
 }
 
-function choisir(f) {
+// ---------------------------------------------------------------- fiche d'un gcode (fenêtre)
+// Clic sur un gcode : fenêtre avec son aperçu 3D couche par couche, le plastique prévu, le choix de
+// l'emplacement de l'ACE (conseillé d'après le fil prévu), « Imprimer » et « Supprimer ».
+
+let vue = null;                 // aperçu 3D (module chargé à la première ouverture)
+const tailleTexte = (n) => (n == null ? '—' : n < 1048576 ? `${Math.round(n / 1024)} Ko` : `${arrondi(n / 1048576, 1)} Mo`);
+
+async function choisir(f) {
   choisi = f.nom;
   $('choix-nom').textContent = f.nom;
-  $('choix-infos').textContent = [f.temps_estime ? duree(f.temps_estime) : null, f.poids ? `${arrondi(f.poids, 1)} g` : null,
-    f.filament?.types?.[0] ? `prévu : ${f.filament.types[0]}` : null].filter(Boolean).join(' · ');
-  $('panneau').hidden = false;
+  $('choix-nom').title = f.nom;
+  $('fiche-temps').textContent = f.temps_estime ? duree(f.temps_estime) : '—';
+  $('fiche-poids').textContent = f.poids ? `${arrondi(f.poids, 1)} g` : '—';
+  $('fiche-taille').textContent = tailleTexte(f.taille_octets);
+  $('fiche-couches').textContent = '…';
+  $('fiche-fil').innerHTML = Filament.prevu(f.filament ?? null);
+  $('fiche-suivi').href = `suivi.html?f=${encodeURIComponent(f.nom)}`;
+  conseillerEmplacement(f);
+  majOccupation();
   afficherFichiers();
+  if (!$('fiche').open) $('fiche').showModal();
+
+  const msg = $('fiche-message');
+  msg.hidden = false;
+  msg.textContent = 'Lecture du gcode… (la première fois, l\'agent l\'analyse sur la machine)';
+  try {
+    if (!vue) {
+      const { Apercu3D } = await import('./apercu3d.js');
+      vue = new Apercu3D($('fiche-vue'), (nom) => `${API}/machines/${encodeURIComponent(machine)}/files/${nom}`);
+    }
+    vue.vider();
+    const meta = await vue.charger(f.nom);
+    if (choisi !== f.nom) return;            // un autre gcode a été ouvert entre-temps
+    const n = meta.layers.length;
+    $('fiche-couches').textContent = n;
+    const c = $('fiche-couche');
+    c.max = Math.max(0, n - 1);
+    c.value = n - 1;
+    c.disabled = !n;
+    majCoucheFiche(n - 1);
+    msg.hidden = n > 0;
+    if (!n) msg.textContent = 'Ce fichier ne contient aucune extrusion.';
+  } catch (e) {
+    if (choisi !== f.nom) return;
+    $('fiche-couches').textContent = '—';
+    msg.textContent = `Aperçu impossible : ${e.message}`;
+  }
+}
+
+function majCoucheFiche(i) {
+  const L = vue?.meta ? vue.meta.layers : [];
+  $('fiche-couche-txt').textContent = L.length ? `${i + 1} / ${L.length} · ${arrondi(L[i][0], 2)} mm` : '—';
+}
+$('fiche-couche').addEventListener('input', (ev) => {
+  const i = Number(ev.target.value);
+  vue?.afficherJusqua(i);
+  majCoucheFiche(i);
+});
+document.querySelectorAll('#fiche [data-vue]').forEach((b) => b.addEventListener('click', () => vue?.vue(b.dataset.vue)));
+$('fiche-fermer').addEventListener('click', () => $('fiche').close());
+$('fiche').addEventListener('close', () => { choisi = null; afficherFichiers(); });
+
+// présélectionne l'emplacement de l'ACE dont le fil ressemble le plus à celui prévu par le gcode
+function conseillerEmplacement(f) {
+  const el = $('fiche-conseil');
+  const fils = dernierEtat?.ace?.fils;
+  el.hidden = true;
+  el.classList.remove('alerte');
+  if (!fils || !fils.length) return;
+  const c = Filament.conseil(f.filament, fils);
+  if (!c) {
+    el.hidden = !f.filament;
+    el.textContent = 'Aucun emplacement de l\'ACE ne contient de fil.';
+    return;
+  }
+  $('emplacement').value = String(c.emplacement);
+  const meme = Filament.alerte(f.filament, { emplacement: c.emplacement, matiere: c.matiere }) === null;
+  el.innerHTML = `Conseillé : ${Filament.pastille(c.color)}emplacement ${c.emplacement}`
+    + (c.matiere ? ` (${Filament.echapper(c.matiere)})` : '')
+    + (meme ? ' : le plus proche du plastique prévu.' : ' : attention, aucun emplacement n\'a la même matière.');
+  el.classList.toggle('alerte', !meme);
+  el.hidden = false;
+}
+
+// plastique choisi différent de celui prévu : prévenir avant de lancer
+$('emplacement').addEventListener('change', () => {
+  const f = fichiers.find((x) => x.nom === choisi);
+  const s = Number($('emplacement').value) || 1;          // vide = emplacement 1 par défaut
+  const fil = dernierEtat?.ace?.fils?.find((x) => x.emplacement === s);
+  const a = f && fil ? Filament.alerte(f.filament, { emplacement: s, matiere: fil.matiere }) : null;
+  const el = $('fiche-conseil');
+  el.classList.toggle('alerte', !!a);
+  el.hidden = !a && !fil;
+  if (a) el.textContent = `⚠ ${a}`;
+  else if (fil) el.innerHTML = `${Filament.pastille(fil.color)}Emplacement ${s}${fil.matiere ? ` · ${Filament.echapper(fil.matiere)}` : ''}`;
+});
+
+function majOccupation() {
+  const pret = dernierEtat?.state === 'READY';
+  $('btn-imprimer').disabled = !pret;
+  $('fiche-occupee').hidden = pret || !dernierEtat;
+  $('fiche-occupee').textContent = dernierEtat?.state === 'PRINTING' || dernierEtat?.state === 'BREAK'
+    ? 'L\'imprimante est déjà en train d\'imprimer.' : 'L\'imprimante n\'est pas prête.';
 }
 
 $('recherche').addEventListener('input', afficherFichiers);
@@ -292,14 +405,38 @@ $('recherche').addEventListener('input', afficherFichiers);
 
 $('btn-imprimer').addEventListener('click', async () => {
   if (!choisi) return;
-  const corps = { fichier: choisi };
+  const nom = choisi;
+  const corps = { fichier: nom };
   if ($('emplacement').value) corps.emplacement = Number($('emplacement').value);
   $('btn-imprimer').disabled = true;
   const r = await api('POST', `/machines/${encodeURIComponent(machine)}/print`, corps);
   $('btn-imprimer').disabled = false;
   if (!r.ok) return toast(texteErreur(r.json), true);
-  operations.set(r.json.operation, `Lancement de ${choisi}`);
-  toast(`Lancement de ${choisi}…`);
+  operations.set(r.json.operation, `Lancement de ${nom}`);
+  toast(`Lancement de ${nom}…`);
+  $('fiche').close();
+});
+
+// ---------------------------------------------------------------- suppression (code 2FA redemandé par le serveur)
+
+$('fiche-supprimer').addEventListener('click', async () => {
+  if (!choisi) return;
+  const nom = choisi;
+  const d = $('suppression');
+  $('suppr-nom').textContent = nom;
+  d.returnValue = '';
+  d.showModal();
+  $('suppr-ok').focus();
+  const oui = await new Promise((ok) => d.addEventListener('close', () => ok(d.returnValue === 'oui'), { once: true }));
+  if (!oui) return;
+  $('fiche-supprimer').disabled = true;
+  const r = await api('DELETE', `/machines/${encodeURIComponent(machine)}/files/${cheminUrl(nom)}`);
+  $('fiche-supprimer').disabled = false;
+  if (!r.ok) { if (r.json?.erreur !== 'annule') toast(texteErreur(r.json), true); return; }
+  toast(`${nom} supprimé`);
+  if (vue?.nom === nom) vue.vider();
+  $('fiche').close();
+  await chargerFichiers();
 });
 
 // envoie une commande ; les longues (home, chargement...) répondent 202 et finissent plus tard (flux « operation »)

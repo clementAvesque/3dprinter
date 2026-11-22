@@ -25,7 +25,7 @@ function creerClients({ db, config, journal, courriel }) {
   const URL_SITE = config.boutique.urlSite.replace(/\/+$/, '');
 
   const q = {
-    session: db.prepare(`SELECT s.*, c.email, c.nom, c.email_verifie, c.actif FROM sessions_client s
+    session: db.prepare(`SELECT s.*, c.email, c.nom, c.pseudo, c.email_verifie, c.actif FROM sessions_client s
                          JOIN clients c ON c.id = s.client_id WHERE s.id = ?`),
     vu: db.prepare('UPDATE sessions_client SET vu_le = ? WHERE id = ?'),
     supprimer: db.prepare('DELETE FROM sessions_client WHERE id = ?'),
@@ -59,7 +59,7 @@ function creerClients({ db, config, journal, courriel }) {
     return s;
   }
 
-  const public_ = (c) => ({ id: c.id, email: c.email, nom: c.nom, email_verifie: !!c.email_verifie });
+  const public_ = (c) => ({ id: c.id, email: c.email, nom: c.nom, pseudo: c.pseudo || null, email_verifie: !!c.email_verifie });
 
   // envoie un lien à usage unique ; seule l'empreinte du jeton est gardée en base
   async function envoyerLien(client, type) {
@@ -113,7 +113,7 @@ function creerClients({ db, config, journal, courriel }) {
         } else {
           if (now - s.vu_le > 60e3) q.vu.run(now, s.id);
           req.sessionClient = s;
-          req.client = { id: s.client_id, email: s.email, nom: s.nom, email_verifie: !!s.email_verifie };
+          req.client = { id: s.client_id, email: s.email, nom: s.nom, pseudo: s.pseudo || null, email_verifie: !!s.email_verifie };
         }
       }
     }
@@ -276,6 +276,29 @@ function creerClients({ db, config, journal, courriel }) {
     journal('client.mot_de_passe', { req, cible: c.email, resultat: 'ok' });
     res.json({ ok: true });
   }));
+
+  // profil : nom (livraisons, e-mails) et pseudo (signature publique des projets publiés dans la galerie).
+  // Pseudo unique (sans tenir compte des majuscules) : personne ne peut se faire passer pour un autre auteur.
+  const PSEUDO_RE = /^[\p{L}\p{N}][\p{L}\p{N} ._-]{1,22}[\p{L}\p{N}]$/u;
+  r.patch('/moi', connecte, (req, res) => {
+    const { nom, pseudo, ...reste } = req.body || {};
+    if (Object.keys(reste).length || (nom === undefined && pseudo === undefined)) return res.status(400).json({ erreur: 'champ_inconnu' });
+    if (nom !== undefined && (typeof nom !== 'string' || !nom.trim() || nom.length > 80)) return res.status(400).json({ erreur: 'nom_invalide' });
+    if (pseudo !== undefined && pseudo !== null && (typeof pseudo !== 'string' || !PSEUDO_RE.test(pseudo.trim()))) {
+      return res.status(400).json({ erreur: 'pseudo_invalide', detail: '3 à 24 lettres, chiffres, espaces, . _ -' });
+    }
+    const c = q.parId.get(req.client.id);
+    const nouveauPseudo = pseudo === undefined ? c.pseudo : (pseudo === null ? null : pseudo.trim());
+    if (nouveauPseudo && db.prepare('SELECT 1 FROM clients WHERE pseudo = ? COLLATE NOCASE AND id != ?').get(nouveauPseudo, c.id)) {
+      return res.status(409).json({ erreur: 'pseudo_pris' });
+    }
+    if (!nouveauPseudo && db.prepare('SELECT 1 FROM publications WHERE client_id = ? AND retiree_le IS NULL').get(c.id)) {
+      return res.status(409).json({ erreur: 'pseudo_requis', detail: 'tes projets publiés sont signés de ce pseudo' });
+    }
+    db.prepare('UPDATE clients SET nom = ?, pseudo = ? WHERE id = ?').run(nom === undefined ? c.nom : nom.trim(), nouveauPseudo, c.id);
+    journal('client.profil', { req, cible: c.email, resultat: 'ok' });
+    res.json({ client: public_(q.parId.get(c.id)) });
+  });
 
   const purger = () => {
     const now = Date.now();

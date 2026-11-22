@@ -110,7 +110,8 @@ export class Apercu3D {
   async charger(nom) {
     // le premier appel peut être long : l'agent lit le gcode sur la machine puis l'envoie (gardé en cache ensuite)
     const base = this.base(cheminUrl(nom));
-    const options = { credentials: window.API_BASE ? "include" : "same-origin" };
+    // no-cache : copie du navigateur revalidée auprès du serveur (un même nom peut désigner un autre gcode)
+    const options = { credentials: window.API_BASE ? "include" : "same-origin", cache: "no-cache" };
     const metaRep = await fetch(`${base}/toolpath`, options);
     const meta = await metaRep.json().catch(() => ({}));
     if (!metaRep.ok) throw new Error(texteErreur(meta));
@@ -119,6 +120,10 @@ export class Apercu3D {
     const bin = await binRep.arrayBuffer();
 
     const n = meta.segments;
+    // en-tête et segments doivent venir du même gcode : 9 octets par segment
+    if (!Number.isInteger(n) || bin.byteLength !== n * 9) {
+      throw new Error(`aperçu incohérent (${n} trajets annoncés, ${bin.byteLength} octets reçus) : recharge la page`);
+    }
     const c = new Int16Array(bin, 0, n * 4);
     const types = new Uint8Array(bin, n * 8, n);
 
