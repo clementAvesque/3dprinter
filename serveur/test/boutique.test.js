@@ -673,3 +673,15 @@ test('galerie : l\'auteur publie un projet validé sous un pseudo, un autre clie
   assert.equal(c.pseudo, null);
   assert.ok(srv.db.prepare('SELECT 1 FROM commandes WHERE id = ?').get(cmd), 'commande gardée (comptabilité)');
 });
+
+test('noms de fichiers accentués : lus en UTF-8 à l\'envoi, anciens noms mal décodés réparés', async () => {
+  const { reparerNom } = require('../src/db-boutique');
+  assert.equal(reparerNom('piece cassÃ© - Copie.stl'), 'piece cassé - Copie.stl');
+  assert.equal(reparerNom('pièce cassée.stl'), 'pièce cassée.stl', 'nom déjà correct : inchangé');
+  assert.equal(reparerNom('support.stl'), 'support.stl');
+  assert.equal(reparerNom('prix 5 €.stl'), 'prix 5 €.stl');
+  const c = await clientDirect('accents@test.local');
+  const f = await c.req('POST', '/fichiers', envoiStl('pièce cassée.stl', cube(10)));
+  assert.equal(f.statut, 201, JSON.stringify(f.json));
+  assert.equal(f.json.nom, 'pièce cassée.stl');
+});

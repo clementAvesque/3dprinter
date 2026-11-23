@@ -48,6 +48,13 @@ const SCHEMA_PLAQUES = `
     CREATE INDEX IF NOT EXISTS lot_pieces_lot ON lot_pieces(lot_id);
     CREATE INDEX IF NOT EXISTS lot_pieces_piece ON lot_pieces(devis_piece_id);`;
 
+// texte UTF-8 lu par erreur en latin1 (« Ã© » pour « é ») -> texte d'origine ; sinon inchangé
+function reparerNom(nom) {
+  if (!/[\u0080-ÿ]/.test(nom) || /[^\u0000-ÿ]/.test(nom)) return nom;
+  const utf8 = Buffer.from(nom, 'latin1').toString('utf8');
+  return utf8.includes('�') ? nom : utf8;
+}
+
 function schemaBoutique(db) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS clients (
@@ -272,6 +279,14 @@ function schemaBoutique(db) {
   // celles d'avant cette colonne (décision de l'exploitant, auteurs prévenus par lui) ; 0 = aperçu seul.
   ajouterColonne('publications', 'partage_stl', 'INTEGER NOT NULL DEFAULT 1');
 
+  // noms de STL envoyés avant le décodage UTF-8 de busboy : « cassÃ© » au lieu de « cassé ». Réparés au
+  // démarrage ; un nom déjà correct ne bouge pas (relu en latin1, il ne forme pas de l'UTF-8 valide).
+  const reparer = db.prepare('UPDATE fichiers_stl SET nom_origine = ? WHERE id = ?');
+  for (const f of db.prepare("SELECT id, nom_origine FROM fichiers_stl WHERE nom_origine GLOB '*[^ -~]*'").all()) {
+    const repare = reparerNom(f.nom_origine);
+    if (repare !== f.nom_origine) reparer.run(repare, f.id);
+  }
+
   // identifiant public (UUID v4) de ce que voit le client : les numéros internes (1, 2, 3...) ne sortent jamais
   // du serveur, personne ne peut deviner combien de devis ou de commandes existent ni lire ceux des autres.
   // Rempli par un déclencheur à chaque insertion (quel que soit le code qui insère), et pour les lignes existantes.
@@ -293,4 +308,4 @@ function schemaBoutique(db) {
   for (const i of IMPRIMANTES_DEFAUT) inserer.run(i.id, i.nom, i.x, i.y, i.z, i.buse, i.profil);
 }
 
-module.exports = { schemaBoutique };
+module.exports = { schemaBoutique, reparerNom };

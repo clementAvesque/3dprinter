@@ -281,7 +281,7 @@ function creerBoutique({ config, db, hub, journal, courriel, paiements, clients,
     if (actifs >= 200) return res.status(409).json({ erreur: 'trop_de_fichiers', detail: '200 fichiers gardés au maximum' });
     let bb;
     try {
-      bb = Busboy({ headers: req.headers, limits: { files: 1, fields: 0, fileSize: B.stlMaxOctets + 1 } });
+      bb = Busboy({ headers: req.headers, defParamCharset: 'utf8', limits: { files: 1, fields: 0, fileSize: B.stlMaxOctets + 1 } });
     } catch {
       return res.status(400).json({ erreur: 'multipart_attendu' });
     }
