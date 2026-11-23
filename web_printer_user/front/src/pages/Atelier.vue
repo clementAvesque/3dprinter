@@ -243,7 +243,7 @@ function apresConnexion() {
     </button>
   </main>
 
-  <Galerie :ouverte="galerieOuverte" @fermer="galerieOuverte = false" />
+  <Galerie :ouverte="galerieOuverte" @fermer="galerieOuverte = false" @ouvert="replie = false" />
   <PopupReglages :ouvert="reglagesOuverts" :reglages="atelier.reglages"
                  @fermer="reglagesOuverts = false" @valider="appliquerReglages" />
   <ModaleConnexion :ouvert="connexionOuverte" @fermer="connexionOuverte = false" @connecte="apresConnexion" />

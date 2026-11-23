@@ -1,38 +1,27 @@
 <script setup>
 // Galerie des projets réalisés : publiés par leurs auteurs (pseudo) une fois la commande validée. Monte du bas de
-// l'écran et prend toute la place. Un projet s'ouvre dans l'atelier (ses STL sur le plateau, à ajuster : quantités,
-// taille, réglages) si son auteur l'a accepté ; ou se choisit tel quel : devis à son nom (mêmes pièces, mêmes
-// réglages), découpé par le serveur, à commander seul ou avec ses autres devis.
+// l'écran et prend toute la place. Un clic sur un projet pose ses STL sur le plateau de l'atelier (visuel STL) :
+// le client y ajuste quantités, taille et réglages, puis clique sur « Découper » comme pour ses propres fichiers.
+// Aucun devis n'est créé depuis la galerie.
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
-import ApercuGcode from './ApercuGcode.vue';
-import ModaleConnexion from './ModaleConnexion.vue';
-import { useSession } from '../stores/session.js';
 import { useAtelier } from '../stores/atelier.js';
 import { api } from '../api.js';
 
 const props = defineProps({ ouverte: Boolean });
-const emit = defineEmits(['fermer']);
-const session = useSession();
+const emit = defineEmits(['fermer', 'ouvert']);
 const atelier = useAtelier();
-const routeur = useRouter();
 
 const projets = ref([]);
 const etat = ref('');                 // chargement | pret | erreur
-const choisi = ref(null);             // projet affiché en détail
 const recherche = ref('');
-const ajout = ref({ occupe: false, erreur: '', devis: null });
-const connexionOuverte = ref(false);
-const ouverture = ref({ occupe: false, erreur: '' });   // ouverture du projet dans l'atelier
+const ouverture = ref({ id: null, erreur: '', projet: null });   // projet en cours d'ouverture dans l'atelier
 const fermer = ref(null);
 
-const PROPRETES = { fine: 'Fine · 0,2 mm + lissage', rapide: 'Rapide · 0,28 mm' };
 const mm = (v) => `${Math.round(v * 10) / 10}`.replace('.', ',');
 const euros = (cts) => (cts == null ? '—' : `${(cts / 100).toFixed(2).replace('.', ',')} €`);
-const duree = (s) => { if (!s) return '—'; const h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60); return h ? `${h} h ${String(m).padStart(2, '0')}` : `${m} min`; };
-const date = (ms) => new Date(ms).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
 const nbPieces = (p) => p.pieces.reduce((t, x) => t + x.quantite, 0);
 const plusGrande = (p) => p.pieces.reduce((m, x) => (Math.max(...x.dims_mm) > Math.max(...m) ? x.dims_mm : m), [0, 0, 0]);
+const ouvrable = (p) => p.ajustable && p.disponible;
 
 const visibles = computed(() => {
   const r = recherche.value.trim().toLowerCase();
@@ -50,64 +39,34 @@ async function charger() {
   }
 }
 
-function voir(p) {
-  choisi.value = p;
-  ajout.value = { occupe: false, erreur: '', devis: null };
-  ouverture.value = { occupe: false, erreur: '' };
-}
-
-// projet posé sur le plateau de l'atelier (STL téléchargés), la galerie se referme pour le montrer
-async function ouvrirDansAtelier() {
-  ouverture.value = { occupe: true, erreur: '' };
+// clic sur un projet : ses STL sur le plateau de l'atelier, la galerie se referme pour le montrer
+async function ouvrir(p) {
+  if (ouverture.value.id || !ouvrable(p)) return;
+  ouverture.value = { id: p.id, erreur: '', projet: null };
   try {
-    await atelier.ajouterProjet(choisi.value);
-    ouverture.value = { occupe: false, erreur: '' };
+    await atelier.ajouterProjet(p);
+    ouverture.value = { id: null, erreur: '', projet: null };
+    emit('ouvert');
     emit('fermer');
   } catch (e) {
-    ouverture.value = { occupe: false, erreur: e.message };
+    ouverture.value = { id: null, erreur: e.message, projet: p.id };
   }
 }
 
-async function ajouter() {
-  if (!session.client) { connexionOuverte.value = true; return; }
-  ajout.value = { occupe: true, erreur: '', devis: null };
-  try {
-    const d = await api('POST', `/galerie/${choisi.value.id}/devis`, {});
-    ajout.value = { occupe: false, erreur: '', devis: d };
-    choisi.value.choisie++;
-  } catch (e) {
-    if (e.code === 'non_connecte') { session.client = null; connexionOuverte.value = true; }
-    ajout.value = { occupe: false, erreur: e.message, devis: null };
-  }
-}
-
-function apresConnexion() {
-  connexionOuverte.value = false;
-  ajouter();
-}
-
-function allerA(chemin) {
-  emit('fermer');
-  routeur.push(chemin);
-}
-
-// Échap : retour à la liste, puis fermeture
 function touche(e) {
-  if (e.key !== 'Escape' || connexionOuverte.value) return;
-  if (choisi.value) choisi.value = null;
-  else emit('fermer');
+  if (e.key === 'Escape') emit('fermer');
 }
 
 watch(() => props.ouverte, async (o) => {
   document.body.style.overflow = o ? 'hidden' : '';
   if (o) {
     window.addEventListener('keydown', touche);
+    ouverture.value = { id: null, erreur: '', projet: null };
     if (etat.value !== 'pret') charger();
     await nextTick();
     fermer.value?.focus();
   } else {
     window.removeEventListener('keydown', touche);
-    choisi.value = null;
   }
 });
 onBeforeUnmount(() => { window.removeEventListener('keydown', touche); document.body.style.overflow = ''; });
@@ -123,95 +82,43 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', touche); document.
         </button>
         <div class="titres">
           <h2 id="galerie-titre">Projets réalisés</h2>
-          <p class="discret">Validés par notre atelier et partagés par leurs auteurs. Un projet te plaît ? Ouvre-le dans l'atelier pour l'ajuster.</p>
+          <p class="discret">Validés par notre atelier et partagés par leurs auteurs. Clique sur un projet : il s'ouvre sur ton plateau,
+            tu changes la taille et le nombre d'exemplaires, puis tu découpes.</p>
         </div>
-        <input v-if="!choisi && projets.length" v-model="recherche" class="recherche" type="search" placeholder="Chercher un projet, un auteur…"
+        <input v-if="projets.length" v-model="recherche" class="recherche" type="search" placeholder="Chercher un projet, un auteur…"
                aria-label="Chercher dans la galerie">
       </header>
 
       <div class="corps">
-        <!-- détail d'un projet -->
-        <div v-if="choisi" class="detail">
-          <button class="lien retour" type="button" @click="choisi = null">← Tous les projets</button>
-          <div class="detail-grille">
-            <ApercuGcode :key="choisi.id" :source="`/api/client/galerie/${choisi.id}`" />
-            <div class="fiche">
-              <div>
-                <h3>{{ choisi.titre }}</h3>
-                <p class="auteur">par <b>{{ choisi.auteur }}</b> · publié en {{ date(choisi.cree_le) }}</p>
-              </div>
-              <ul class="pieces">
-                <li v-for="(x, i) in choisi.pieces" :key="i">
-                  <span>{{ x.nom }}</span>
-                  <small class="discret">{{ mm(x.dims_mm[0]) }} × {{ mm(x.dims_mm[1]) }} × {{ mm(x.dims_mm[2]) }} mm</small>
-                  <b>× {{ x.quantite }}</b>
-                </li>
-              </ul>
-              <dl class="chiffres">
-                <div><dt>Matière</dt><dd>{{ choisi.poids_g == null ? '—' : `${mm(choisi.poids_g)} g` }}</dd></div>
-                <div><dt>Impression</dt><dd>{{ duree(choisi.duree_s) }}</dd></div>
-                <div><dt>Prix indicatif</dt><dd>{{ euros(choisi.prix_matiere_cts) }}</dd></div>
-              </dl>
-              <p class="discret petit">{{ PROPRETES[choisi.reglages.proprete] }} · remplissage {{ choisi.reglages.remplissage_pct }} %.
-                Le prix exact (et la livraison) est calculé à la découpe de ton devis.</p>
-
-              <template v-if="ajout.devis">
-                <p class="info">Devis créé d'après le projet de {{ choisi.auteur }} : il est en cours de découpe. Commande-le seul, ou avec tes autres devis depuis ton compte.</p>
-                <div class="actions">
-                  <button class="primaire" type="button" @click="allerA(`/devis/${ajout.devis.id}`)">Voir mon devis</button>
-                  <button class="secondaire" type="button" @click="choisi = null">Continuer à regarder</button>
-                </div>
-              </template>
-              <template v-else>
-                <p v-if="ajout.erreur || ouverture.erreur" class="erreur" role="alert">{{ ajout.erreur || ouverture.erreur }}</p>
-                <template v-if="choisi.ajustable">
-                  <button class="primaire grand" type="button" :disabled="ouverture.occupe || ajout.occupe || !choisi.disponible" @click="ouvrirDansAtelier">
-                    {{ ouverture.occupe ? 'Ouverture…' : 'Ouvrir dans l\'atelier pour l\'ajuster' }}
-                  </button>
-                  <p class="discret petit">Ses pièces arrivent sur ton plateau{{ atelier.pieces.length ? ', à côté des tiennes' : '' }} :
-                    change les quantités, la taille et les réglages, puis découpe.</p>
-                </template>
-                <button :class="choisi.ajustable ? 'secondaire' : 'primaire grand'" type="button" :disabled="ajout.occupe || ouverture.occupe || !choisi.disponible"
-                        @click="ajouter">
-                  {{ ajout.occupe ? 'Création du devis…' : session.client ? (choisi.ajustable ? 'Ajouter tel quel à mes devis' : 'Ajouter à mes devis')
-                    : 'Se connecter pour l\'ajouter' }}
-                </button>
-                <p v-if="choisi.choisie" class="discret petit">Déjà choisi {{ choisi.choisie }} fois.</p>
-              </template>
-            </div>
-          </div>
+        <p v-if="etat === 'chargement'" class="discret centre">Chargement des projets…</p>
+        <p v-else-if="etat === 'erreur'" class="erreur centre">La galerie n'a pas pu être chargée. <button class="lien" type="button" @click="charger">Réessayer</button></p>
+        <div v-else-if="!projets.length" class="vide">
+          <b>Aucun projet publié pour l'instant.</b>
+          <p class="discret">Ta commande a été validée ? Publie ton projet depuis ton espace compte (onglet Devis) : il apparaîtra ici, signé de ton pseudo.</p>
         </div>
-
-        <!-- liste des projets -->
-        <template v-else>
-          <p v-if="etat === 'chargement'" class="discret centre">Chargement des projets…</p>
-          <p v-else-if="etat === 'erreur'" class="erreur centre">La galerie n'a pas pu être chargée. <button class="lien" type="button" @click="charger">Réessayer</button></p>
-          <div v-else-if="!projets.length" class="vide">
-            <b>Aucun projet publié pour l'instant.</b>
-            <p class="discret">Ta commande a été validée ? Publie ton projet depuis ton espace compte (onglet Devis) : il apparaîtra ici, signé de ton pseudo.</p>
-          </div>
-          <p v-else-if="!visibles.length" class="discret centre">Aucun projet ne correspond à « {{ recherche }} ».</p>
-          <ul v-else class="grille">
-            <li v-for="p in visibles" :key="p.id">
-              <button class="projet" type="button" @click="voir(p)">
-                <span class="vignette" aria-hidden="true">
-                  <svg viewBox="0 0 64 64" width="56" height="56"><path d="M32 6l22 12v28L32 58 10 46V18z M32 6v52 M10 18l22 12 22-12" fill="none"
-                    stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/></svg>
-                  <small>{{ mm(plusGrande(p)[0]) }} × {{ mm(plusGrande(p)[1]) }} × {{ mm(plusGrande(p)[2]) }} mm</small>
-                </span>
-                <span class="infos">
-                  <b class="titre">{{ p.titre }}</b>
-                  <span class="auteur">par {{ p.auteur }}</span>
-                  <small class="discret">{{ nbPieces(p) }} pièce(s) · {{ p.poids_g == null ? '' : `${mm(p.poids_g)} g · ` }}{{ euros(p.prix_matiere_cts) }}</small>
-                </span>
-              </button>
-            </li>
-          </ul>
-        </template>
+        <p v-else-if="!visibles.length" class="discret centre">Aucun projet ne correspond à « {{ recherche }} ».</p>
+        <ul v-else class="grille">
+          <li v-for="p in visibles" :key="p.id">
+            <button class="projet" type="button" :disabled="!ouvrable(p) || !!ouverture.id" :aria-busy="ouverture.id === p.id"
+                    :title="ouvrable(p) ? 'Ouvrir sur mon plateau pour l\'ajuster' : 'Ce projet n\'est plus disponible'" @click="ouvrir(p)">
+              <span class="vignette" aria-hidden="true">
+                <svg viewBox="0 0 64 64" width="56" height="56"><path d="M32 6l22 12v28L32 58 10 46V18z M32 6v52 M10 18l22 12 22-12" fill="none"
+                  stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/></svg>
+                <small>{{ mm(plusGrande(p)[0]) }} × {{ mm(plusGrande(p)[1]) }} × {{ mm(plusGrande(p)[2]) }} mm</small>
+              </span>
+              <span class="infos">
+                <b class="titre">{{ p.titre }}</b>
+                <span class="auteur">par {{ p.auteur }}</span>
+                <small class="discret">{{ nbPieces(p) }} pièce(s) · {{ p.poids_g == null ? '' : `${mm(p.poids_g)} g · ` }}{{ euros(p.prix_matiere_cts) }}</small>
+                <span class="action">{{ ouverture.id === p.id ? 'Ouverture…' : ouvrable(p) ? 'Ouvrir sur mon plateau →' : 'Indisponible' }}</span>
+              </span>
+            </button>
+            <p v-if="ouverture.projet === p.id && ouverture.erreur" class="erreur petit" role="alert">{{ ouverture.erreur }}</p>
+          </li>
+        </ul>
       </div>
     </section>
   </Transition>
-  <ModaleConnexion :ouvert="connexionOuverte" @fermer="connexionOuverte = false" @connecte="apresConnexion" />
 </template>
 
 <style scoped>
@@ -234,36 +141,21 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', touche); document.
 
 .grille { list-style: none; margin: 0 auto; padding: 0; max-width: 1400px; display: grid; gap: 14px;
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+.grille li { display: flex; flex-direction: column; gap: 6px; }
 .projet { width: 100%; height: 100%; padding: 0; display: flex; flex-direction: column; text-align: left; overflow: hidden; border-radius: 16px;
   border: 1px solid var(--bord); background: var(--fond-carte); transition: border-color .15s, transform .15s, box-shadow .15s; }
-.projet:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 10px 26px rgba(0, 0, 0, .12); }
+.projet:not(:disabled):hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 10px 26px rgba(0, 0, 0, .12); }
+.projet[aria-busy="true"] { border-color: var(--accent); opacity: 1; }
 .vignette { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; aspect-ratio: 4 / 3; color: var(--accent);
   background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--accent) 14%, var(--fond-vue)), var(--fond-vue)); }
 .vignette small { color: var(--discret); font-size: 12px; }
 .infos { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px 14px; min-width: 0; }
 .titre { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .auteur { color: var(--accent); font-size: 13px; }
-
-.detail { max-width: 1300px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
-.retour { align-self: flex-start; background: none; border: 0; padding: 0; }
-.detail-grille { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; align-items: start; }
-.fiche { display: flex; flex-direction: column; gap: 14px; padding: 18px; border-radius: 16px; border: 1px solid var(--bord); background: var(--fond-carte); }
-.fiche h3 { margin: 0; font-size: 20px; }
-.fiche .auteur { margin: 2px 0 0; }
-.pieces { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
-.pieces li { display: flex; align-items: baseline; gap: 10px; padding: 7px 0; border-top: 1px solid var(--bord); flex-wrap: wrap; }
-.pieces li:first-child { border-top: 0; }
-.pieces li span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.chiffres { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0; }
-.chiffres div { padding: 8px 10px; border-radius: 10px; background: var(--fond-champ); }
-.chiffres dt { font-size: 12px; color: var(--discret); }
-.chiffres dd { margin: 0; font-weight: 600; }
+.action { margin-top: 6px; font-size: 13px; font-weight: 600; color: var(--accent); }
 .petit { font-size: 13px; margin: 0; }
-.actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.grand { padding: 12px 16px; }
 
 @media (max-width: 860px) {
-  .detail-grille { grid-template-columns: minmax(0, 1fr); }
   .tete { padding: 12px 16px; }
   .corps { padding: 16px; }
   .recherche { max-width: none; }
