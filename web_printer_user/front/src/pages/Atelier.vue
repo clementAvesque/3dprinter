@@ -94,20 +94,22 @@ async function decouper() {
   const pieces = atelier.pieces;
   const premiere = new Map(atelier.rangement.places.filter((p) => p.n === 0).map((p) => [p.id, p]));
   try {
-    const ids = [];
-    for (const [i, p] of pieces.entries()) {
-      envoi.value = { etape: `Envoi de ${p.nom} (${i + 1}/${pieces.length})`, pct: 0 };
+    // pièces ouvertes depuis la galerie : déjà sur le serveur, désignées par projet + numéro (pas d'envoi)
+    const aEnvoyer = pieces.filter((p) => !p.projet);
+    const ids = new Map();
+    for (const [i, p] of aEnvoyer.entries()) {
+      envoi.value = { etape: `Envoi de ${p.nom} (${i + 1}/${aEnvoyer.length})`, pct: 0 };
       const f = await envoyerStl(p.fichier, (x) => { envoi.value.pct = Math.round(x * 100); });
-      ids.push(f.id);
+      ids.set(p.id, f.id);
     }
     envoi.value = { etape: 'Création du devis', pct: 100 };
     const devis = await api('POST', '/devis', {
       imprimante_id: atelier.imprimante.id,
       reglages: atelier.reglages,
-      pieces: pieces.map((p, i) => {
+      pieces: pieces.map((p) => {
         const pl = premiere.get(p.id);
-        return { fichier_id: ids[i], quantite: p.quantite, echelle: p.echelle,
-          ...(pl ? { pos_mm: [pl.x, pl.y], rotation_deg: pl.rot } : {}) };
+        return { ...(p.projet ? { projet_id: p.projet.id, piece: p.projet.n } : { fichier_id: ids.get(p.id) }),
+          quantite: p.quantite, echelle: p.echelle, ...(pl ? { pos_mm: [pl.x, pl.y], rotation_deg: pl.rot } : {}) };
       }),
     });
     atelier.vider();
@@ -186,6 +188,7 @@ function apresConnexion() {
               <div class="nom-piece" @click="atelier.choisir(p.id)">
                 <b :title="p.nom">{{ p.nom }}</b>
                 <small>{{ mm(p.dims[0]) }} × {{ mm(p.dims[1]) }} × {{ mm(p.dims[2]) }} mm<template v-if="p.echelle !== 1"> · taille {{ fois(p.echelle) }}</template></small>
+                <small v-if="p.projet" class="info-auto">d'après « {{ p.projet.titre }} » de {{ p.projet.auteur }}</small>
                 <small v-if="p.auto" class="info-auto">Fichier en mètres ? Taille multipliée par 1000 automatiquement.</small>
                 <small v-if="atelier.trop_grandes.includes(p)" class="erreur">trop grande pour nos imprimantes</small>
                 <small v-if="atelier.trop_petites.includes(p)" class="erreur">moins d'1 mm : augmente le multiplicateur de taille</small>

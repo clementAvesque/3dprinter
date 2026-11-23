@@ -24,7 +24,8 @@ const STATUTS_COMMANDE = {
   validee: 'validée, envoi à l\'impression', dans_un_lot: 'en attente d\'impression', en_impression: 'en cours d\'impression',
   suspendue: 'en préparation', imprimee: 'imprimée, bientôt envoyée', expediee: 'envoyée', livree: 'livrée', remboursee: 'remboursée',
 };
-const REALISEE = ['imprimee', 'expediee', 'livree'];
+// une commande se publie dans la galerie dès que l'atelier l'a validée (pas besoin d'attendre l'impression)
+const PUBLIABLE = ['validee', 'dans_un_lot', 'en_impression', 'suspendue', 'imprimee', 'expediee', 'livree'];
 const date = (ms) => new Date(ms).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
 const euros = (cts) => `${(cts / 100).toFixed(2).replace('.', ',')} €`;
 const PAYS = [['FR', 'France'], ['BE', 'Belgique'], ['CH', 'Suisse'], ['LU', 'Luxembourg'], ['MC', 'Monaco']];
@@ -53,8 +54,8 @@ function commanderSelection() {
   if (coches.value.length) routeur.push(`/commande/${coches.value.join(',')}`);
 }
 
-// ---------------------------------------------------------------- galerie : publier un projet imprimé
-const publiable = (d) => !d.galerie && !d.publication && d.statut === 'pret' && d.commande && REALISEE.includes(d.commande.statut);
+// ---------------------------------------------------------------- galerie : publier un projet validé
+const publiable = (d) => !d.galerie && !d.publication && d.statut === 'pret' && d.commande && PUBLIABLE.includes(d.commande.statut);
 const publication = reactive({ devis: null, titre: '' });
 function preparerPublication(d) {
   publication.devis = d.id;
@@ -73,6 +74,7 @@ async function retirer(id) {
   if (await essayer(() => api('DELETE', `/publications/${id}`))) { signaler('Projet retiré de la galerie.'); await charger(); }
 }
 async function republier(p) {
+  if (!confirm("Republier ce projet ? Les visiteurs pourront ouvrir ses fichiers STL dans leur atelier pour l'ajuster et le commander.")) return;
   if (await essayer(() => api('POST', `/devis/${p.devis_id}/publier`, { titre: p.titre }))) { signaler('Projet de nouveau visible.'); await charger(); }
 }
 
@@ -198,7 +200,8 @@ async function deconnexion() {
                 <label>Titre du projet<input v-model="publication.titre" maxlength="60" required placeholder="Ex. Support de vélo"></label>
                 <p class="discret petit">Il sera visible par tous, signé
                   <b>{{ session.client?.pseudo || '(choisis d\'abord un pseudo dans Profil et sécurité)' }}</b>. Les visiteurs voient l'aperçu 3D
-                  et les dimensions ; tes fichiers STL ne sont jamais téléchargeables. Tu peux le retirer à tout moment.</p>
+                  et peuvent ouvrir tes fichiers STL dans leur atelier pour les ajuster (taille, quantités, réglages) et les commander.
+                  Tu peux le retirer à tout moment.</p>
                 <div class="boutons">
                   <button class="primaire" :disabled="!session.client?.pseudo">Publier</button>
                   <button class="secondaire" type="button" @click="publication.devis = null">Annuler</button>
@@ -214,8 +217,8 @@ async function deconnexion() {
         <!-- publications -->
         <section v-else-if="onglet === 'galerie'" class="carte">
           <h2>Mes publications</h2>
-          <p class="discret">Tes projets imprimés, partagés dans la galerie sous ton pseudo. Pour en publier un, va dans <button class="lien"
-            type="button" @click="aller('devis')">Devis</button> : le bouton apparaît une fois la commande imprimée.</p>
+          <p class="discret">Tes projets, partagés dans la galerie sous ton pseudo. Pour en publier un, va dans <button class="lien"
+            type="button" @click="aller('devis')">Devis</button> : le bouton apparaît dès que ta commande est validée par l'atelier.</p>
           <p v-if="!publications.length" class="discret">Aucune publication pour l'instant.</p>
           <ul class="liste">
             <li v-for="p in publications" :key="p.id">

@@ -5,7 +5,12 @@ const chargeur = new STLLoader();
 
 // géométrie posée sur le plateau : base à z = 0, centrée en x et y
 export async function lireStl(fichier) {
-  const octets = await fichier.arrayBuffer();
+  return lireOctets(await fichier.arrayBuffer(), fichier.name);
+}
+
+// même lecture à partir des octets (STL d'un projet de la galerie, téléchargé du serveur)
+export function lireOctets(octets, nom) {
+  const fichier = { name: nom };
   let geo;
   try {
     geo = chargeur.parse(octets);

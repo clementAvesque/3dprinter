@@ -563,7 +563,7 @@ async function clientDirect(email) {
   return c;
 }
 
-test('galerie : l\'auteur publie un projet imprimé sous un pseudo, un autre client le choisit (devis à son nom, STL jamais exposé)', async () => {
+test('galerie : l\'auteur publie un projet validé sous un pseudo, un autre client le choisit tel quel ou l\'ouvre dans l\'atelier', async () => {
   const auteur = await clientDirect('auteur@test.local');
   const reglages = { remplissage_pct: 20, couches_surface: 4, proprete: 'fine' };
   const f = await auteur.req('POST', '/fichiers', envoiStl('support-velo.stl', cube(15)));
@@ -572,11 +572,13 @@ test('galerie : l\'auteur publie un projet imprimé sous un pseudo, un autre cli
   assert.equal(d.statut, 'pret', d.erreur);
   const publier = (titre = 'Support de vélo') => auteur.req('POST', `/devis/${d.id}/publier`, { titre });
 
-  assert.equal((await publier()).json.erreur, 'pas_encore_realise', 'pas encore commandé ni imprimé');
+  assert.equal((await publier()).json.erreur, 'pas_encore_valide', 'pas encore commandé');
   const auteurId = srv.db.prepare("SELECT id FROM clients WHERE email = 'auteur@test.local'").get().id;
   const cmd = srv.db.prepare(`INSERT INTO commandes (client_id, devis_id, statut, livraison_nom, livraison_adresse, sous_total_cts,
-    livraison_cts, total_cts, cree_le) VALUES (?, ?, 'imprimee', 'Auteur', '{}', 1, 1, 2, ?)`).run(auteurId, interne('devis', d.id), Date.now()).lastInsertRowid;
-  assert.equal((await publier()).json.erreur, 'pseudo_requis');
+    livraison_cts, total_cts, cree_le) VALUES (?, ?, 'payee', 'Auteur', '{}', 1, 1, 2, ?)`).run(auteurId, interne('devis', d.id), Date.now()).lastInsertRowid;
+  assert.equal((await publier()).json.erreur, 'pas_encore_valide', 'payée mais pas encore validée par l\'admin');
+  srv.db.prepare("UPDATE commandes SET statut = 'validee' WHERE id = ?").run(cmd);
+  assert.equal((await publier()).json.erreur, 'pseudo_requis', 'validée : publiable dès qu\'il y a un pseudo');
 
   // pseudo : unique (sans tenir compte des majuscules), format contrôlé
   assert.equal((await auteur.req('PATCH', '/moi', { pseudo: '<b>x' })).json.erreur, 'pseudo_invalide');
@@ -596,10 +598,33 @@ test('galerie : l\'auteur publie un projet imprimé sous un pseudo, un autre cli
   const visiteur = new Client();
   const g = await visiteur.req('GET', '/galerie');
   const projet = g.json.find((x) => x.id === pub.json.id);
-  assert.deepEqual(projet.pieces, [{ nom: 'support-velo', quantite: 3, dims_mm: [15, 15, 15] }]);
+  assert.deepEqual(projet.pieces, [{ n: 1, nom: 'support-velo', quantite: 3, echelle: 1, dims_mm: [15, 15, 15] }]);
+  assert.equal(projet.ajustable, true);
   assert.doesNotMatch(JSON.stringify(g.json), /auteur@test|Clément|fichier_id|stl\//);
   assert.equal((await visiteur.req('GET', `/galerie/${projet.id}/trajets`)).statut, 200);
   assert.equal((await visiteur.req('POST', `/galerie/${projet.id}/devis`, {})).statut, 401, 'choisir demande un compte');
+
+  // ouvert dans l'atelier : le STL s'affiche chez le visiteur, puis le devis désigne la pièce par projet + numéro
+  const stl = await visiteur.req('GET', `/galerie/${projet.id}/pieces/1`);
+  assert.equal(stl.statut, 200);
+  assert.equal(Buffer.from(await stl.res.arrayBuffer()).length, cube(15).length);
+  assert.equal((await visiteur.req('GET', `/galerie/${projet.id}/pieces/2`)).statut, 404);
+  const ajuste = await autre.req('POST', '/devis', { imprimante_id: 'kobra-1', reglages: { ...reglages, remplissage_pct: 40 },
+    pieces: [{ projet_id: projet.id, piece: 1, quantite: 1, echelle: 2 }] });
+  assert.equal(ajuste.statut, 201, JSON.stringify(ajuste.json));
+  assert.equal(ajuste.json.galerie.id, projet.id);
+  assert.equal(ajuste.json.pieces[0].fichier_id, null, 'le fichier reste celui de l\'auteur');
+  assert.deepEqual(ajuste.json.pieces[0].dims_mm, [30, 30, 30]);
+  assert.equal((await autre.req('POST', '/devis', { imprimante_id: 'kobra-1', reglages,
+    pieces: [{ projet_id: projet.id, piece: 9, quantite: 1 }] })).json.erreur, 'projet_inconnu');
+  assert.equal((await devisDecoupe(autre, ajuste.json.id)).statut, 'pret', 'découpé avec la taille ajustée');
+  assert.equal((await autre.req('DELETE', `/devis/${ajuste.json.id}`)).statut, 200);
+  // publication d'avant le partage des STL : aperçu seul, pas d'ouverture dans l'atelier
+  srv.db.prepare('UPDATE publications SET partage_stl = 0 WHERE uuid = ?').run(projet.id);
+  assert.equal((await visiteur.req('GET', `/galerie/${projet.id}/pieces/1`)).statut, 404);
+  assert.equal((await autre.req('POST', '/devis', { imprimante_id: 'kobra-1', reglages,
+    pieces: [{ projet_id: projet.id, piece: 1, quantite: 1 }] })).json.erreur, 'projet_inconnu');
+  srv.db.prepare('UPDATE publications SET partage_stl = 1 WHERE uuid = ?').run(projet.id);
 
   // choisi par un autre client : devis à son nom, mêmes pièces et réglages, redécoupé
   const choix = await autre.req('POST', `/galerie/${projet.id}/devis`, {});
@@ -611,7 +636,7 @@ test('galerie : l\'auteur publie un projet imprimé sous un pseudo, un autre cli
   assert.equal((await devisDecoupe(autre, choix.json.id)).statut, 'pret');
   assert.equal((await autre.req('GET', `/fichiers/${f.json.id}`)).statut, 404, 'STL de l\'auteur jamais téléchargeable');
   assert.equal((await autre.req('GET', '/fichiers')).json.length, 0);
-  assert.equal((await visiteur.req('GET', '/galerie')).json.find((x) => x.id === projet.id).choisie, 1);
+  assert.equal((await visiteur.req('GET', '/galerie')).json.find((x) => x.id === projet.id).choisie, 2, 'ouvert dans l\'atelier + choisi tel quel');
   assert.equal((await autre.req('POST', `/devis/${choix.json.id}/publier`, { titre: 'à moi' })).statut, 409, 'on ne republie pas le projet d\'un autre');
   // l'acheteur supprime son devis : le fichier de l'auteur reste
   assert.equal((await autre.req('DELETE', `/devis/${choix.json.id}`)).statut, 200);
@@ -623,7 +648,12 @@ test('galerie : l\'auteur publie un projet imprimé sous un pseudo, un autre cli
   assert.ok(fs.existsSync(disque), 'fichier d\'un projet publié gardé');
 
   // retiré par son auteur : plus visible
-  assert.equal((await auteur.req('GET', '/publications')).json[0].choisie, 1);
+  assert.equal((await auteur.req('GET', '/publications')).json[0].choisie, 2);
+
+  // commande remboursée (refusée par l'admin) : le projet sort de la galerie
+  srv.db.prepare("UPDATE commandes SET statut = 'remboursee' WHERE id = ?").run(cmd);
+  assert.ok(!(await visiteur.req('GET', '/galerie')).json.some((x) => x.id === projet.id));
+  srv.db.prepare("UPDATE commandes SET statut = 'validee' WHERE id = ?").run(cmd);
   assert.equal((await auteur.req('DELETE', `/publications/${projet.id}`)).statut, 200);
   assert.ok(!(await visiteur.req('GET', '/galerie')).json.some((x) => x.id === projet.id));
   assert.equal((await visiteur.req('GET', `/galerie/${projet.id}/trajets`)).statut, 404);

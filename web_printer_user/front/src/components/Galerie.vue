@@ -1,17 +1,20 @@
 <script setup>
-// Galerie des projets réalisés : publiés par leurs auteurs (pseudo), imprimés pour de vrai. Monte du bas de
-// l'écran et prend toute la place. Choisir un projet crée un devis à son nom (mêmes pièces, mêmes réglages),
-// découpé par le serveur, à commander seul ou avec ses autres devis. Les STL ne quittent jamais le serveur.
+// Galerie des projets réalisés : publiés par leurs auteurs (pseudo) une fois la commande validée. Monte du bas de
+// l'écran et prend toute la place. Un projet s'ouvre dans l'atelier (ses STL sur le plateau, à ajuster : quantités,
+// taille, réglages) si son auteur l'a accepté ; ou se choisit tel quel : devis à son nom (mêmes pièces, mêmes
+// réglages), découpé par le serveur, à commander seul ou avec ses autres devis.
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import ApercuGcode from './ApercuGcode.vue';
 import ModaleConnexion from './ModaleConnexion.vue';
 import { useSession } from '../stores/session.js';
+import { useAtelier } from '../stores/atelier.js';
 import { api } from '../api.js';
 
 const props = defineProps({ ouverte: Boolean });
 const emit = defineEmits(['fermer']);
 const session = useSession();
+const atelier = useAtelier();
 const routeur = useRouter();
 
 const projets = ref([]);
@@ -20,6 +23,7 @@ const choisi = ref(null);             // projet affiché en détail
 const recherche = ref('');
 const ajout = ref({ occupe: false, erreur: '', devis: null });
 const connexionOuverte = ref(false);
+const ouverture = ref({ occupe: false, erreur: '' });   // ouverture du projet dans l'atelier
 const fermer = ref(null);
 
 const PROPRETES = { fine: 'Fine · 0,2 mm + lissage', rapide: 'Rapide · 0,28 mm' };
@@ -49,6 +53,19 @@ async function charger() {
 function voir(p) {
   choisi.value = p;
   ajout.value = { occupe: false, erreur: '', devis: null };
+  ouverture.value = { occupe: false, erreur: '' };
+}
+
+// projet posé sur le plateau de l'atelier (STL téléchargés), la galerie se referme pour le montrer
+async function ouvrirDansAtelier() {
+  ouverture.value = { occupe: true, erreur: '' };
+  try {
+    await atelier.ajouterProjet(choisi.value);
+    ouverture.value = { occupe: false, erreur: '' };
+    emit('fermer');
+  } catch (e) {
+    ouverture.value = { occupe: false, erreur: e.message };
+  }
 }
 
 async function ajouter() {
@@ -106,7 +123,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', touche); document.
         </button>
         <div class="titres">
           <h2 id="galerie-titre">Projets réalisés</h2>
-          <p class="discret">Imprimés pour nos clients et partagés par leurs auteurs. Un projet te plaît ? On le découpe pour toi.</p>
+          <p class="discret">Validés par notre atelier et partagés par leurs auteurs. Un projet te plaît ? Ouvre-le dans l'atelier pour l'ajuster.</p>
         </div>
         <input v-if="!choisi && projets.length" v-model="recherche" class="recherche" type="search" placeholder="Chercher un projet, un auteur…"
                aria-label="Chercher dans la galerie">
@@ -146,9 +163,18 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', touche); document.
                 </div>
               </template>
               <template v-else>
-                <p v-if="ajout.erreur" class="erreur" role="alert">{{ ajout.erreur }}</p>
-                <button class="primaire grand" type="button" :disabled="ajout.occupe || !choisi.disponible" @click="ajouter">
-                  {{ ajout.occupe ? 'Création du devis…' : session.client ? 'Ajouter à mes devis' : 'Se connecter pour l\'ajouter' }}
+                <p v-if="ajout.erreur || ouverture.erreur" class="erreur" role="alert">{{ ajout.erreur || ouverture.erreur }}</p>
+                <template v-if="choisi.ajustable">
+                  <button class="primaire grand" type="button" :disabled="ouverture.occupe || ajout.occupe || !choisi.disponible" @click="ouvrirDansAtelier">
+                    {{ ouverture.occupe ? 'Ouverture…' : 'Ouvrir dans l\'atelier pour l\'ajuster' }}
+                  </button>
+                  <p class="discret petit">Ses pièces arrivent sur ton plateau{{ atelier.pieces.length ? ', à côté des tiennes' : '' }} :
+                    change les quantités, la taille et les réglages, puis découpe.</p>
+                </template>
+                <button :class="choisi.ajustable ? 'secondaire' : 'primaire grand'" type="button" :disabled="ajout.occupe || ouverture.occupe || !choisi.disponible"
+                        @click="ajouter">
+                  {{ ajout.occupe ? 'Création du devis…' : session.client ? (choisi.ajustable ? 'Ajouter tel quel à mes devis' : 'Ajouter à mes devis')
+                    : 'Se connecter pour l\'ajouter' }}
                 </button>
                 <p v-if="choisi.choisie" class="discret petit">Déjà choisi {{ choisi.choisie }} fois.</p>
               </template>
@@ -162,7 +188,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', touche); document.
           <p v-else-if="etat === 'erreur'" class="erreur centre">La galerie n'a pas pu être chargée. <button class="lien" type="button" @click="charger">Réessayer</button></p>
           <div v-else-if="!projets.length" class="vide">
             <b>Aucun projet publié pour l'instant.</b>
-            <p class="discret">Tu as fait imprimer quelque chose ? Publie-le depuis ton espace compte (onglet Devis) : il apparaîtra ici, signé de ton pseudo.</p>
+            <p class="discret">Ta commande a été validée ? Publie ton projet depuis ton espace compte (onglet Devis) : il apparaîtra ici, signé de ton pseudo.</p>
           </div>
           <p v-else-if="!visibles.length" class="discret centre">Aucun projet ne correspond à « {{ recherche }} ».</p>
           <ul v-else class="grille">

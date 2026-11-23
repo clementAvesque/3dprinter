@@ -36,7 +36,7 @@ const MESSAGES = {
   pseudo_pris: 'Ce pseudo est déjà pris : choisis-en un autre.',
   pseudo_requis: "Choisis d'abord un pseudo (onglet Profil) : il signe tes projets dans la galerie.",
   titre_invalide: 'Donne un titre à ton projet (60 caractères au plus).',
-  pas_encore_realise: 'Seul un projet déjà imprimé peut être publié.',
+  pas_encore_valide: "Un projet se publie une fois ta commande validée par l'atelier.",
   projet_d_un_autre: 'Ce devis vient de la galerie : seul son auteur peut le publier.',
   projet_inconnu: "Ce projet n'est plus dans la galerie.",
   projet_indisponible: "Ce projet n'est plus disponible.",
@@ -77,6 +77,18 @@ export async function api(methode, chemin, corps) {
   const json = (rep.headers.get('content-type') || '').includes('json') ? await rep.json() : null;
   if (!rep.ok) throw new ErreurApi(rep.status, json);
   return json;
+}
+
+// STL d'une pièce d'un projet de la galerie (ouvert dans l'atelier pour être ajusté)
+export async function telechargerStlProjet(projetId, n) {
+  let rep;
+  try {
+    rep = await fetch(`${BASE}/galerie/${encodeURIComponent(projetId)}/pieces/${n}`, { credentials: 'same-origin' });
+  } catch {
+    throw new ErreurApi(0, { erreur: 'reseau' });
+  }
+  if (!rep.ok) throw new ErreurApi(rep.status, (rep.headers.get('content-type') || '').includes('json') ? await rep.json() : null);
+  return rep.arrayBuffer();
 }
 
 // envoi d'un STL avec la progression (fetch ne la donne pas pour les envois)

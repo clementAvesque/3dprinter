@@ -383,9 +383,17 @@ function creerBoutique({ config, db, hub, journal, courriel, paiements, clients,
       return res.status(429).json({ erreur: 'trop_de_devis', detail: `${DEVIS_EN_ATTENTE_MAX} devis en cours de découpe au plus : attends qu'ils soient prêts` });
     }
     const lignes = [];
+    const projets = new Map();          // publications dont viennent des pièces (ouvertes depuis la galerie)
     for (const p of pieces) {
-      const { fichier_id: fid, quantite, pos_mm: pos, rotation_deg: rot, echelle = 1, ...trop } = p || {};
-      const f = uuidValide(fid) ? q.fichierDuClient.get(fid, req.client.id) : null;
+      // pièce : un fichier du client (fichier_id) ou la pièce n d'un projet de la galerie (projet_id + piece)
+      const { fichier_id: fid, projet_id: projetId, piece: n, quantite, pos_mm: pos, rotation_deg: rot, echelle = 1, ...trop } = p || {};
+      let f = null;
+      if (projetId !== undefined) {
+        const r = fid === undefined ? pieceDuProjet(String(projetId), n) : null;
+        if (!r) return res.status(400).json({ erreur: 'projet_inconnu', detail: String(projetId).slice(0, 40) });
+        projets.set(r.pu.id, r.pu);
+        f = q.fichier.get(r.p.fichier_id);
+      } else if (uuidValide(fid)) f = q.fichierDuClient.get(fid, req.client.id);
       if (Object.keys(trop).length || !f || !f.chemin) return res.status(400).json({ erreur: 'fichier_inconnu', detail: String(fid).slice(0, 40) });
       if (!entier(quantite, 1, 50)) return res.status(400).json({ erreur: 'quantite_invalide', detail: '1 à 50' });
       if (pos !== undefined && (!Array.isArray(pos) || pos.length !== 2 || !reel(pos[0], -1000, 1000) || !reel(pos[1], -1000, 1000))) {
@@ -405,8 +413,12 @@ function creerBoutique({ config, db, hub, journal, courriel, paiements, clients,
       }
       lignes.push([f.id, quantite, pos?.[0] ?? null, pos?.[1] ?? null, rot ?? 0, echelle]);
     }
-    const id = creerDevis(req.client.id, imp, { remp, couches, proprete_mm: PROPRETES[proprete] }, lignes);
-    journal('client.devis', { req, cible: `${req.client.email} devis ${id}`, resultat: 'ok', detail: `${lignes.length} pièce(s)` });
+    // devis avec des pièces d'un projet : relié au (premier) projet, ce qui empêche aussi de le republier comme le sien
+    const [premier] = projets.values();
+    const id = creerDevis(req.client.id, imp, { remp, couches, proprete_mm: PROPRETES[proprete] }, lignes, premier?.id ?? null);
+    for (const pu of projets.values()) db.prepare('UPDATE publications SET choisie = choisie + 1 WHERE id = ?').run(pu.id);
+    journal('client.devis', { req, cible: `${req.client.email} devis ${id}`, resultat: 'ok',
+      detail: `${lignes.length} pièce(s)${projets.size ? `, projet(s) ${[...projets.values()].map((pu) => pu.uuid).join(' ')}` : ''}` });
     res.status(201).json(devisComplet(db.prepare('SELECT * FROM devis WHERE id = ?').get(id)));
   });
 
@@ -632,13 +644,20 @@ function creerBoutique({ config, db, hub, journal, courriel, paiements, clients,
   });
 
   // ------------------------------------------------ galerie des projets réalisés
-  // Un client publie un de ses projets imprimés (devis d'une commande imprimée, expédiée ou livrée), signé de son
-  // pseudo, et peut le retirer à tout moment. Les autres le voient en 3D (aperçu du gcode, jamais le STL) et le
-  // choisissent : un devis à leur nom est découpé avec les mêmes pièces et réglages, à commander comme les leurs.
+  // Un client publie un de ses projets dès que l'admin a validé sa commande (pas besoin d'attendre l'impression),
+  // signé de son pseudo, et peut le retirer à tout moment. Les autres le voient en 3D (aperçu du gcode) et :
+  //  - le choisissent tel quel : un devis à leur nom est découpé avec les mêmes pièces et réglages ;
+  //  - ou l'ouvrent dans l'atelier (publications avec partage_stl) : ses STL s'affichent sur leur plateau, ils
+  //    changent quantités, taille et réglages, puis découpent ; le devis désigne les pièces par projet + numéro.
+  // Une commande remboursée (refusée, jamais envoyée) retire son projet de la galerie.
 
-  const STATUTS_REALISES = ['imprimee', 'expediee', 'livree'];
+  const STATUTS_PUBLIABLES = ['validee', 'dans_un_lot', 'en_impression', 'suspendue', 'imprimee', 'expediee', 'livree'];
   const PUBLICATION_VISIBLE = `SELECT pu.*, c.pseudo FROM publications pu JOIN clients c ON c.id = pu.client_id
-    JOIN devis d ON d.id = pu.devis_id WHERE pu.retiree_le IS NULL AND c.actif = 1 AND c.pseudo IS NOT NULL AND d.statut = 'pret'`;
+    JOIN devis d ON d.id = pu.devis_id WHERE pu.retiree_le IS NULL AND c.actif = 1 AND c.pseudo IS NOT NULL AND d.statut = 'pret'
+    AND NOT EXISTS (SELECT 1 FROM commande_devis cd JOIN commandes co ON co.id = cd.commande_id
+      WHERE cd.devis_id = d.id AND co.statut = 'remboursee')`;
+  const piecesDuProjet = (devisId) => db.prepare(`SELECT p.*, f.nom_origine, f.dim_x_mm, f.dim_y_mm, f.dim_z_mm, f.chemin
+    FROM devis_pieces p JOIN fichiers_stl f ON f.id = p.fichier_id WHERE p.devis_id = ? ORDER BY p.id`).all(devisId);
 
   function retirerPublicationsDuFichier(fichierId) {
     db.prepare(`UPDATE publications SET retiree_le = ? WHERE retiree_le IS NULL AND devis_id IN (
@@ -648,16 +667,24 @@ function creerBoutique({ config, db, hub, journal, courriel, paiements, clients,
   // projet vu dans la galerie : ce qu'il faut pour choisir (pièces, tailles, réglages, poids), rien de privé
   function projetPublic(pu) {
     const d = db.prepare('SELECT * FROM devis WHERE id = ?').get(pu.devis_id);
-    const pieces = db.prepare(`SELECT p.quantite, p.echelle, f.nom_origine, f.dim_x_mm, f.dim_y_mm, f.dim_z_mm, f.chemin
-      FROM devis_pieces p JOIN fichiers_stl f ON f.id = p.fichier_id WHERE p.devis_id = ? ORDER BY p.id`).all(d.id);
+    const pieces = piecesDuProjet(d.id);
     return { id: pu.uuid, titre: pu.titre, auteur: pu.pseudo, cree_le: pu.cree_le, choisie: pu.choisie,
       imprimante_id: d.imprimante_id, poids_g: d.poids_g, duree_s: d.duree_s, prix_matiere_cts: d.prix_matiere_cts,
       reglages: { remplissage_pct: d.remplissage_pct, couches_surface: d.couches_surface, proprete: d.proprete_mm === 0.2 ? 'fine' : 'rapide' },
       disponible: pieces.every((p) => p.chemin),
-      pieces: pieces.map((p) => ({ nom: p.nom_origine.replace(/\.stl$/i, ''), quantite: p.quantite,
+      ajustable: !!pu.partage_stl,          // peut s'ouvrir dans l'atelier (l'auteur a accepté de partager ses STL)
+      pieces: pieces.map((p, i) => ({ n: i + 1, nom: p.nom_origine.replace(/\.stl$/i, ''), quantite: p.quantite, echelle: p.echelle,
         dims_mm: [p.dim_x_mm, p.dim_y_mm, p.dim_z_mm].map((v) => Math.round(v * p.echelle * 10) / 10) })) };
   }
   const publicationVisible = (uuid) => (uuidValide(uuid) ? db.prepare(`${PUBLICATION_VISIBLE} AND pu.uuid = ?`).get(uuid) : null);
+
+  // pièce n (à partir de 1) d'un projet ouvrable dans l'atelier -> ligne devis_pieces + fichier, ou null
+  function pieceDuProjet(uuid, n) {
+    const pu = publicationVisible(uuid);
+    if (!pu || !pu.partage_stl || !Number.isInteger(n) || n < 1) return null;
+    const p = piecesDuProjet(pu.devis_id)[n - 1];
+    return p && p.chemin ? { pu, p } : null;
+  }
 
   // ouverte à tous (même sans compte) : la vitrine du site
   rc.get('/galerie', (req, res) => {
@@ -673,6 +700,16 @@ function creerBoutique({ config, db, hub, journal, courriel, paiements, clients,
     const pu = publicationVisible(String(req.params.id));
     if (!pu) return res.status(404).json({ erreur: 'projet_inconnu' });
     envoyerTrajets(res, pu.devis_id, 'bin');
+  });
+
+  // STL d'une pièce d'un projet ouvrable dans l'atelier (affichage et ajustement dans le navigateur du visiteur)
+  const limiteStlGalerie = rateLimit({ windowMs: 3600e3, limit: 200, standardHeaders: 'draft-7', legacyHeaders: false,
+    message: { erreur: 'trop_de_requetes' } });
+  rc.get('/galerie/:id/pieces/:n', limiteStlGalerie, (req, res) => {
+    const r = pieceDuProjet(String(req.params.id), Number(req.params.n));
+    if (!r) return res.status(404).json({ erreur: 'projet_inconnu' });
+    res.set({ 'Content-Type': 'model/stl', 'Cache-Control': 'private, max-age=600' });
+    fs.createReadStream(path.join(config.donnees, r.p.chemin)).pipe(zlib.createGunzip()).on('error', () => res.destroy()).pipe(res);
   });
 
   // choisir un projet : devis à son nom, mêmes pièces et réglages, découpé à nouveau (profil d'impression actuel)
@@ -702,7 +739,8 @@ function creerBoutique({ config, db, hub, journal, courriel, paiements, clients,
       devis_id: pu.devis_uuid, devis_ref: ref(pu.devis_uuid), cree_le: pu.cree_le, retiree_le: pu.retiree_le, choisie: pu.choisie })));
   });
 
-  // publier un projet réalisé (ou le republier après l'avoir retiré)
+  // publier un projet dont la commande est validée (ou le republier après l'avoir retiré). Publier vaut accord
+  // pour que les visiteurs ouvrent ses STL dans leur atelier (dit au client sur le formulaire de publication).
   rc.post('/devis/:id/publier', connecte, (req, res) => {
     const { titre, ...reste } = req.body || {};
     if (Object.keys(reste).length) return res.status(400).json({ erreur: 'champ_inconnu' });
@@ -711,12 +749,12 @@ function creerBoutique({ config, db, hub, journal, courriel, paiements, clients,
     if (!d) return res.status(404).json({ erreur: 'devis_inconnu' });
     if (d.publication_id) return res.status(409).json({ erreur: 'projet_d_un_autre', detail: 'ce devis vient de la galerie' });
     const c = q.commandeDuDevis.get(d.id);
-    if (d.statut !== 'pret' || !c || !STATUTS_REALISES.includes(c.statut)) return res.status(409).json({ erreur: 'pas_encore_realise' });
+    if (d.statut !== 'pret' || !c || !STATUTS_PUBLIABLES.includes(c.statut)) return res.status(409).json({ erreur: 'pas_encore_valide' });
     if (!req.client.pseudo) return res.status(409).json({ erreur: 'pseudo_requis' });
     const absent = db.prepare(`SELECT 1 FROM devis_pieces p JOIN fichiers_stl f ON f.id = p.fichier_id WHERE p.devis_id = ? AND f.chemin = ''`).get(d.id);
     if (absent) return res.status(409).json({ erreur: 'fichier_indisponible' });
-    db.prepare(`INSERT INTO publications (client_id, devis_id, titre, cree_le) VALUES (?, ?, ?, ?)
-      ON CONFLICT(devis_id) DO UPDATE SET titre = excluded.titre, retiree_le = NULL, cree_le = excluded.cree_le`)
+    db.prepare(`INSERT INTO publications (client_id, devis_id, titre, cree_le, partage_stl) VALUES (?, ?, ?, ?, 1)
+      ON CONFLICT(devis_id) DO UPDATE SET titre = excluded.titre, retiree_le = NULL, cree_le = excluded.cree_le, partage_stl = 1`)
       .run(req.client.id, d.id, titre.trim(), Date.now());
     journal('client.galerie.publier', { req, cible: `${req.client.email} devis ${d.id}`, resultat: 'ok' });
     res.status(201).json(projetPublic(db.prepare(`${PUBLICATION_VISIBLE} AND pu.devis_id = ?`).get(d.id)));

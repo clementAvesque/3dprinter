@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { markRaw } from 'vue';
-import { api } from '../api.js';
-import { lireStl } from '../lib/stl.js';
+import { api, telechargerStlProjet } from '../api.js';
+import { lireStl, lireOctets } from '../lib/stl.js';
 import { ranger, choisirImprimante, tient } from '../lib/rangement.js';
 
 let suivant = 1;
@@ -12,7 +12,9 @@ export const ECHELLE_MAX = 1000;
 // pièces déposées (gardées dans le navigateur jusqu'à la découpe), réglages, imprimante choisie
 export const useAtelier = defineStore('atelier', {
   state: () => ({
-    // { id, nom, fichier, geometrie, dimsBase (mm du fichier), echelle, dims (= dimsBase x echelle), volume, quantite, auto }
+    // { id, nom, fichier, geometrie, dimsBase (mm du fichier), echelle, dims (= dimsBase x echelle), volume, quantite, auto,
+    //   projet } ; projet = { id, n, titre, auteur } pour une pièce ouverte depuis la galerie (fichier = null : elle reste
+    //   sur le serveur, le devis la désigne par projet + numéro)
     pieces: [],
     selection: null,       // id de la pièce sélectionnée (clic dans la liste ou sur le plateau 3D)
     reglages: { remplissage_pct: 15, couches_surface: 3, proprete: 'fine' },
@@ -52,6 +54,28 @@ export const useAtelier = defineStore('atelier', {
           this.erreurs.push(e.message);
         }
       }
+    },
+    // projet de la galerie ouvert dans l'atelier : ses pièces (STL téléchargés), tailles et quantités d'origine.
+    // Atelier vide : ses réglages aussi. Tout reste modifiable avant « Découper ».
+    async ajouterProjet(projet) {
+      this.erreurs = [];
+      const vide = !this.pieces.length;
+      const lues = [];
+      try {
+        for (const x of projet.pieces) {
+          const nom = `${x.nom}.stl`;
+          const { geometrie, dims, volume } = lireOctets(await telechargerStlProjet(projet.id, x.n), nom);
+          lues.push({ id: suivant++, nom, fichier: null, geometrie: markRaw(geometrie), dimsBase: dims, echelle: x.echelle,
+            dims: dims.map((v) => v * x.echelle), volume, quantite: x.quantite, auto: false,
+            projet: { id: projet.id, n: x.n, titre: projet.titre, auteur: projet.auteur } });
+        }
+      } catch (e) {
+        for (const p of lues) p.geometrie.dispose();
+        throw e;
+      }
+      this.pieces.push(...lues);
+      if (vide) this.reglages = { ...projet.reglages };
+      this.selection = lues[0]?.id ?? null;
     },
     changerEchelle(id, valeur) {
       const p = this.pieces.find((x) => x.id === id);
