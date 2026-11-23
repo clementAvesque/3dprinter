@@ -268,9 +268,9 @@ function schemaBoutique(db) {
     );
     CREATE INDEX IF NOT EXISTS publications_visibles ON publications(retiree_le, cree_le);
   `);
-  // l'auteur a accepté que ses STL s'ouvrent dans l'atelier des visiteurs (pour les ajuster) : publications
-  // faites après ce changement ; les plus anciennes restent en aperçu seul tant qu'elles ne sont pas republiées
-  ajouterColonne('publications', 'partage_stl', 'INTEGER NOT NULL DEFAULT 0');
+  // les STL du projet s'ouvrent dans l'atelier des visiteurs (pour les ajuster). Toutes les publications, y compris
+  // celles d'avant cette colonne (décision de l'exploitant, auteurs prévenus par lui) ; 0 = aperçu seul.
+  ajouterColonne('publications', 'partage_stl', 'INTEGER NOT NULL DEFAULT 1');
 
   // identifiant public (UUID v4) de ce que voit le client : les numéros internes (1, 2, 3...) ne sortent jamais
   // du serveur, personne ne peut deviner combien de devis ou de commandes existent ni lire ceux des autres.

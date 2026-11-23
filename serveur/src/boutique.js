@@ -672,7 +672,7 @@ function creerBoutique({ config, db, hub, journal, courriel, paiements, clients,
       imprimante_id: d.imprimante_id, poids_g: d.poids_g, duree_s: d.duree_s, prix_matiere_cts: d.prix_matiere_cts,
       reglages: { remplissage_pct: d.remplissage_pct, couches_surface: d.couches_surface, proprete: d.proprete_mm === 0.2 ? 'fine' : 'rapide' },
       disponible: pieces.every((p) => p.chemin),
-      ajustable: !!pu.partage_stl,          // peut s'ouvrir dans l'atelier (l'auteur a accepté de partager ses STL)
+      ajustable: !!pu.partage_stl,          // peut s'ouvrir dans l'atelier (STL partagés)
       pieces: pieces.map((p, i) => ({ n: i + 1, nom: p.nom_origine.replace(/\.stl$/i, ''), quantite: p.quantite, echelle: p.echelle,
         dims_mm: [p.dim_x_mm, p.dim_y_mm, p.dim_z_mm].map((v) => Math.round(v * p.echelle * 10) / 10) })) };
   }
