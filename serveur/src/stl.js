@@ -77,11 +77,17 @@ function echelonnerStl(buf, k) {
   return sortie;
 }
 
-// la pièce tient-elle sur le plateau ? (rotation de 90° autorisée sur le plateau)
+// Marge gardée de chaque côté du plateau (x, y) : bordure (brim 5 mm), bordure des supports arbre et écart avec
+// le bord qu'Orca garde en rangeant. Sans elle, une pièce de 238 mm « tenait » sur 250 mm mais Orca la refusait
+// (« No object is fully inside the print volume »). Même valeur dans le site client (lib/rangement.js).
+const MARGE_PLATEAU_MM = 10;
+
+// la pièce tient-elle sur le plateau, marges comprises ? (rotation de 90° autorisée sur le plateau)
 function tientSur(dims, imp) {
   const [x, y, z] = dims;
   if (z > imp.plateau_z_mm) return false;
-  return (x <= imp.plateau_x_mm && y <= imp.plateau_y_mm) || (y <= imp.plateau_x_mm && x <= imp.plateau_y_mm);
+  const lx = imp.plateau_x_mm - 2 * MARGE_PLATEAU_MM, ly = imp.plateau_y_mm - 2 * MARGE_PLATEAU_MM;
+  return (x <= lx && y <= ly) || (y <= lx && x <= ly);
 }
 
-module.exports = { analyserStl, echelonnerStl, tientSur, StlInvalide };
+module.exports = { analyserStl, echelonnerStl, tientSur, StlInvalide, MARGE_PLATEAU_MM };

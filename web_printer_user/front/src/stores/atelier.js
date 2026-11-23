@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 import { markRaw } from 'vue';
 import { api, telechargerStlProjet } from '../api.js';
 import { lireStl, lireOctets } from '../lib/stl.js';
-import { ranger, choisirImprimante, tient } from '../lib/rangement.js';
+import { ranger, choisirImprimante, tient, echelleMax } from '../lib/rangement.js';
 
 let suivant = 1;
 
@@ -29,6 +29,8 @@ export const useAtelier = defineStore('atelier', {
       return s.pieces.filter((p) => !s.imprimantes.some((i) => i.disponible && tient(p.dims, i.plateau_mm)));
     },
     trop_petites: (s) => s.pieces.filter((p) => Math.max(...p.dims) < 1),
+    // plus grand multiplicateur de taille possible pour une pièce (meilleure imprimante disponible, marges comprises)
+    echelleMax: (s) => (p) => Math.max(0, ...s.imprimantes.filter((i) => i.disponible).map((i) => echelleMax(p.dimsBase, i.plateau_mm))),
     rangement() {
       return this.imprimante ? ranger(this.pieces, this.imprimante.plateau_mm) : { places: [], hors: [] };
     },

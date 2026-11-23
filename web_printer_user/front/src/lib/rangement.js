@@ -4,9 +4,21 @@
 
 export const MARGE = 6;          // mm entre deux pièces et avec le bord
 
-// une pièce tient-elle sur ce plateau (rotation de 90° autorisée) ?
+// marge gardée de chaque côté du plateau pour la découpe : bordure (brim) et supports ajoutés par Orca.
+// Même valeur que MARGE_PLATEAU_MM côté serveur (serveur/src/stl.js).
+export const MARGE_PLATEAU = 10;
+
+// une pièce tient-elle sur ce plateau, marges comprises (rotation de 90° autorisée) ?
 export function tient([x, y, z], [px, py, pz]) {
-  return z <= pz && ((x <= px && y <= py) || (y <= px && x <= py));
+  const lx = px - 2 * MARGE_PLATEAU, ly = py - 2 * MARGE_PLATEAU;
+  return z <= pz && ((x <= lx && y <= ly) || (y <= lx && x <= ly));
+}
+
+// plus grand multiplicateur de taille pour lequel une pièce (dimensions du fichier) tient sur ce plateau
+export function echelleMax([x, y, z], [px, py, pz]) {
+  const lx = px - 2 * MARGE_PLATEAU, ly = py - 2 * MARGE_PLATEAU;
+  const m = Math.max(Math.min(lx / x, ly / y), Math.min(lx / y, ly / x));
+  return Math.floor(Math.min(m, pz / z) * 100) / 100;
 }
 
 // pieces : [{ id, dims: [x, y, z], quantite }] ; plateau : [x, y, z]

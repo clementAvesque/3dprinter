@@ -2,7 +2,7 @@
 // Faux OrcaSlicer pour les tests : mêmes arguments que le vrai (voir src/orca.js), écrit un petit gcode
 // réaliste dans --outputdir. Le remplissage demandé choisit le scénario :
 //   99 %  -> Orca échoue (code 1)       98 % -> pièces sur 2 plateaux (2 gcodes)
-//   97 %  -> tué faute de mémoire (code 137)                                           sinon -> 1 gcode
+//   97 %  -> tué faute de mémoire (code 137)     95 % -> pièce hors du plateau (code 206)    sinon -> 1 gcode
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -23,6 +23,9 @@ if (!machine.printable_area || machine.thumbnails !== '') { console.error('profi
 const remplissage = process_.sparse_infill_density;
 if (remplissage === '99%') { console.error('[error] slicing failed: test'); process.exit(1); }
 if (remplissage === '97%') { console.error('Killed'); process.exit(137); }      // tué par le système (mémoire)
+if (remplissage === '95%') {                                                    // pièce hors du plateau une fois rangée
+  console.error('plate 1: No object is fully inside the print volume. Arrange ran without rotations.'); process.exit(206);
+}
 if (remplissage === '96%') setTimeout(() => {}, 60e3);                          // très lent : arrêté en cours de route
 
 // taille (x) de la première pièce reçue : vérifie la mise à l'échelle faite par le serveur

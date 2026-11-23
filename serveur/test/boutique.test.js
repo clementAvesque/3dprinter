@@ -685,3 +685,14 @@ test('noms de fichiers accentués : lus en UTF-8 à l\'envoi, anciens noms mal d
   assert.equal(f.statut, 201, JSON.stringify(f.json));
   assert.equal(f.json.nom, 'pièce cassée.stl');
 });
+
+test('pièce presque aussi grande que le plateau : refusée avant la découpe (bordures comprises)', async () => {
+  const c = await clientDirect('marges@test.local');
+  const reglages = { remplissage_pct: 15, couches_surface: 3, proprete: 'fine' };
+  const f = await c.req('POST', '/fichiers', envoiStl('long.stl', cube(10)));
+  const devis = (echelle) => c.req('POST', '/devis', { imprimante_id: 'kobra-1', reglages, pieces: [{ fichier_id: f.json.id, quantite: 1, echelle }] });
+  assert.equal((await devis(23.8)).json.erreur, 'piece_trop_grande', '238 mm sur un plateau de 250 : refusée (cas du dragon)');
+  const ok = await devis(22.9);
+  assert.equal(ok.statut, 201, '229 mm : acceptée');
+  await devisDecoupe(c, ok.json.id);
+});

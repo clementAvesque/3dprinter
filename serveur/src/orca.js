@@ -28,7 +28,8 @@ const fichiersDevis = (dossier, id) => ({
   bin: path.join(dossier, `devis-${id}.trajets.bin.gz`),
 });
 
-function creerDecoupeur({ config, db, calculerPrix }) {
+// quandEchec(devis, detail) : appelée quand une découpe échoue pour une raison inconnue (alerte aux admins)
+function creerDecoupeur({ config, db, calculerPrix, quandEchec }) {
   const O = config.orca;
   const commande = Array.isArray(O.commande) ? O.commande : String(O.commande || '').split(/\s+/).filter(Boolean);
   const dossierGcode = path.join(config.donnees, 'gcode');
@@ -155,6 +156,11 @@ function creerDecoupeur({ config, db, calculerPrix }) {
           + 'ou répartis tes pièces sur plusieurs devis.');
       }
       if (gcodes.length > 1) throw new ErreurDecoupe('Tes pièces ne tiennent pas toutes sur un seul plateau : réduis les quantités ou fais plusieurs devis.');
+      // pièce hors du plateau une fois rangée par Orca (bordure, supports) : à corriger par le client, pas une panne
+      if (r.code !== 0 && /not? object is fully inside the print volume|larger than the printable area/i.test(r.sortie)) {
+        throw new ErreurDecoupe('Une pièce est trop grande pour le plateau une fois la bordure et les supports ajoutés : '
+          + 'réduis sa taille (ou le nombre d\'exemplaires) puis refais un devis.');
+      }
       if (r.code !== 0 || !gcodes.length) {
         throw new Error(`Orca a échoué (code ${r.code}${r.signal ? `, ${r.signal}` : ''}) : ${r.sortie.trim().split('\n').slice(-8).join(' | ')}`);
       }
@@ -195,8 +201,11 @@ function creerDecoupeur({ config, db, calculerPrix }) {
             continue;
           }
           console.error(`[orca] devis ${devis.id} : ${e.message}`);
-          q.erreur.run(e instanceof ErreurDecoupe ? e.message : 'La découpe a échoué. Nous avons été prévenus ; réessaie plus tard.',
+          const connue = e instanceof ErreurDecoupe;
+          q.erreur.run(connue ? e.message : 'La découpe a échoué. Nous avons été prévenus ; réessaie plus tard.',
             Date.now(), devis.id);
+          // panne inconnue (pas une erreur du client) : les admins reçoivent le détail par e-mail
+          if (!connue) Promise.resolve(quandEchec?.(devis, e.message)).catch((x) => console.error(`[orca] alerte : ${x.message}`));
         }
       }
     } finally {

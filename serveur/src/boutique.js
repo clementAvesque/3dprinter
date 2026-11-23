@@ -64,7 +64,15 @@ function creerBoutique({ config, db, hub, journal, courriel, paiements, clients,
   const dossierStl = path.join(config.donnees, 'stl');
   fs.mkdirSync(dossierStl, { recursive: true });
   const decoupeur = creerDecoupeur({ config, db,
-    calculerPrix: (poids) => ({ prix_matiere_cts: prixMatiere(B, poids), livraison_cts: prixLivraison(B, poids) }) });
+    calculerPrix: (poids) => ({ prix_matiere_cts: prixMatiere(B, poids), livraison_cts: prixLivraison(B, poids) }),
+    // découpe en panne (pas une erreur du client) : les admins sont prévenus, comme le dit le message au client
+    quandEchec: (d, detail) => {
+      const c = q.clientEmail.get(d.client_id);
+      journal('orca.echec', { cible: `devis ${d.id}`, resultat: 'erreur', detail: detail.slice(0, 500) });
+      return prevenirAdmins(`Découpe en échec : devis ${ref(d.uuid)}`,
+        `La découpe du devis ${ref(d.uuid)} (n° ${d.id}${c ? `, client ${c.email}` : ''}) a échoué :\n\n${detail}\n\n`
+        + 'Le client voit « La découpe a échoué… réessaie plus tard ». Il peut relancer la découpe depuis son devis.');
+    } });
   // plaques à imprimer : créées à la validation d'une commande, envoyées dans « a_faire/ » sur l'imprimante
   const plaques = creerPlaques({ config, db, hub, journal,
     quandImprimee: (c) => prevenirClient(c, 'Ta commande est imprimée',
@@ -406,7 +414,7 @@ function creerBoutique({ config, db, hub, journal, courriel, paiements, clients,
       }
       const dims = [f.dim_x_mm, f.dim_y_mm, f.dim_z_mm].map((v) => v * echelle);
       if (!tientSur(dims, imp)) {
-        return res.status(400).json({ erreur: 'piece_trop_grande', detail: `${f.nom_origine} ne tient pas sur ${imp.nom}` });
+        return res.status(400).json({ erreur: 'piece_trop_grande', detail: `${f.nom_origine} ne tient pas sur ${imp.nom} (bordures comprises)` });
       }
       if (Math.max(...dims) < 1) {
         return res.status(400).json({ erreur: 'piece_trop_petite', detail: `${f.nom_origine} fait moins d'1 mm : augmente le multiplicateur de taille` });

@@ -14,7 +14,7 @@ const MESSAGES = {
   stl_invalide: 'Ce fichier n\'est pas un STL lisible.',
   stl_attendu: 'Seuls les fichiers .stl sont acceptés.',
   fichier_trop_gros: 'Fichier trop gros.',
-  piece_trop_grande: 'Une pièce est trop grande pour nos imprimantes.',
+  piece_trop_grande: 'Une pièce est trop grande pour le plateau, bordures comprises : réduis sa taille.',
   reseau: 'Le serveur ne répond pas. Vérifie ta connexion (en développement : le serveur local tourne-t-il ?).',
   paiement_non_configure: 'Le paiement en ligne n\'est pas encore ouvert. Reviens bientôt !',
   paiement_indisponible: 'Le service de paiement ne répond pas. Réessaie dans quelques minutes.',

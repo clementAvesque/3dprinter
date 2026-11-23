@@ -190,7 +190,9 @@ function apresConnexion() {
                 <small>{{ mm(p.dims[0]) }} × {{ mm(p.dims[1]) }} × {{ mm(p.dims[2]) }} mm<template v-if="p.echelle !== 1"> · taille {{ fois(p.echelle) }}</template></small>
                 <small v-if="p.projet" class="info-auto">d'après « {{ p.projet.titre }} » de {{ p.projet.auteur }}</small>
                 <small v-if="p.auto" class="info-auto">Fichier en mètres ? Taille multipliée par 1000 automatiquement.</small>
-                <small v-if="atelier.trop_grandes.includes(p)" class="erreur">trop grande pour nos imprimantes</small>
+                <small v-if="atelier.trop_grandes.includes(p)" class="erreur">trop grande pour le plateau (bordures comprises)<template
+                  v-if="atelier.echelleMax(p) >= ECHELLE_MIN"> : taille {{ fois(atelier.echelleMax(p)) }} au plus.
+                  <button class="lien" type="button" @click.stop="regler(p.id, atelier.echelleMax(p))">Appliquer</button></template></small>
                 <small v-if="atelier.trop_petites.includes(p)" class="erreur">moins d'1 mm : augmente le multiplicateur de taille</small>
               </div>
               <div class="quantite" aria-label="quantité">
