@@ -146,7 +146,9 @@ function creerDecoupeur({ config, db, calculerPrix, quandEchec }) {
       const fm = ecrire('machine', machine), fp = ecrire('process', process_), ff = ecrire('filament', lire('filament'));
 
       const sortie = path.join(dossier, 'sortie');
-      const r = await lancerOrca(['--arrange', '1', '--orient', '0', '--slice', '0',
+      // --orient 1 : Orca tourne chaque pièce sur la face qui demande le moins de supports (un STL est souvent
+      // exporté dans une position quelconque : pneu jante en l'air, par ex.) ; --arrange 1 : puis il les range
+      const r = await lancerOrca(['--arrange', '1', '--orient', '1', '--slice', '0',
         '--load-settings', `${fm};${fp}`, '--load-filaments', ff, '--outputdir', sortie, ...stls], dossier);
       const gcodes = (await fsp.readdir(sortie)).filter((n) => n.toLowerCase().endsWith('.gcode'));
       if (r.tropLong) throw new ErreurDecoupe('La découpe a pris trop de temps. Essaie avec moins de pièces.');

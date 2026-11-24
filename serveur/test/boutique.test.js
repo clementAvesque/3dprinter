@@ -407,6 +407,8 @@ test('multiplicateur de taille : STL en mètres (Blender) x1000 -> pièce à la 
   assert.equal(d.pieces[0].echelle, 1000);
   assert.deepEqual(d.pieces[0].dims_mm.map((v) => Math.round(v * 100) / 100), [20, 20, 20]);
   assert.match(gcodeDuDevis(d.id), /; piece1_x = 20\n/, 'Orca reçoit la pièce de 20 mm');
+  assert.match(gcodeDuDevis(d.id), /; orient = 1\n/, 'Orca oriente lui-même les pièces (moins de supports)');
+  assert.match(gcodeDuDevis(d.id), /; support_threshold_angle = 30\n/, 'supports sous les surfaces à moins de 30° seulement');
   // trop grande une fois agrandie
   const g = await carol.req('POST', '/fichiers', envoiStl('cm.stl', cube(20)));
   assert.equal((await carol.req('POST', '/devis', { imprimante_id: 'kobra-1', reglages,

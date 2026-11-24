@@ -41,8 +41,10 @@ CORRECTIONS = {
 # réglages propres à chaque imprimante, par-dessus ceux d'Anycubic.
 # Supports arbre (organiques) automatiques : le profil Anycubic les prépare mais les laisse désactivés,
 # et les pièces des clients ne sont pas toutes imprimables sans. Angle choisi pour la Kobra 3 (buse 0,4,
-# PLA, bonne ventilation) : elle tient proprement les surplombs jusqu'à ~50° de la verticale ; au-delà
-# (surface à moins de 40° de l'horizontale), un support arbre est ajouté. Supports aussi posés sur la pièce
+# PLA, bonne ventilation) : elle tient proprement les surplombs jusqu'à ~60° de la verticale ; au-delà
+# (surface à moins de 30° de l'horizontale, valeur par défaut d'Orca), un support arbre est ajouté. 40° mettait
+# des arbres sous des surplombs qui s'impriment très bien sans (+16 % de plastique sur un plateau de roues F1).
+# Supports aussi posés sur la pièce
 # (pas seulement sur le plateau) : sinon les surplombs au-dessus de la pièce elle-même tombent dans le vide.
 REGLAGES = {
     "kobra3": {
@@ -50,7 +52,7 @@ REGLAGES = {
             "enable_support": "1",
             "support_type": "tree(auto)",
             "support_style": "default",
-            "support_threshold_angle": "40",
+            "support_threshold_angle": "30",
             "support_on_build_plate_only": "0",
             "tree_support_auto_brim": "1",
             # plateau monté sur la Kobra 3 : PEI texturé (PLA à 60 °C dans le profil filament). Sans ce réglage,
