@@ -35,8 +35,12 @@ function stl(paves) {
   return buf;
 }
 const cube = (c = 20) => stl([[0, 0, 0, c, c, c]]);
-// champignon : pied de 6 mm, chapeau de 30 mm à plat au-dessus du vide -> doit recevoir des supports
+// champignon : pied de 6 mm, chapeau de 30 mm à plat au-dessus du vide. Orientation automatique d'Orca
+// (--orient 1) : il le retourne, chapeau sur le plateau -> plus aucun support nécessaire
 const champignon = () => stl([[12, 12, 0, 18, 18, 15], [0, 0, 15, 30, 30, 18]]);
+// croix en 3D (bras dans les 3 directions) : quelle que soit la face posée, deux bras horizontaux surplombent
+// le vide -> doit recevoir des supports
+const croix = () => stl([[12, 12, 0, 18, 18, 30], [0, 12, 12, 30, 18, 18], [12, 0, 12, 18, 30, 18]]);
 
 async function main() {
   const config = charger();
@@ -54,6 +58,10 @@ async function main() {
   const fichierChampignon = db.prepare(`INSERT INTO fichiers_stl (client_id, nom_origine, chemin, taille_octets, sha256, triangles,
     dim_x_mm, dim_y_mm, dim_z_mm, volume_mm3, cree_le, expire_le) VALUES (?, 'champignon.stl', 'stl/champignon.stl.gz', 1284, 'x', 24,
     30, 30, 18, 3240, ?, ?)`).run(client, now, now + 864e5).lastInsertRowid;
+  fs.writeFileSync(path.join(dossier, 'stl', 'croix.stl.gz'), zlib.gzipSync(croix()));
+  const fichierCroix = db.prepare(`INSERT INTO fichiers_stl (client_id, nom_origine, chemin, taille_octets, sha256, triangles,
+    dim_x_mm, dim_y_mm, dim_z_mm, volume_mm3, cree_le, expire_le) VALUES (?, 'croix.stl', 'stl/croix.stl.gz', 1884, 'x', 36,
+    30, 30, 30, 2808, ?, ?)`).run(client, now, now + 864e5).lastInsertRowid;
   const essais = [['fine', 0.2], ['rapide', 0.4]];
   const ids = essais.map(([, couche]) => {
     const id = db.prepare(`INSERT INTO devis (client_id, imprimante_id, remplissage_pct, couches_surface, proprete_mm, statut, cree_le)
@@ -64,6 +72,9 @@ async function main() {
   const idChampignon = db.prepare(`INSERT INTO devis (client_id, imprimante_id, remplissage_pct, couches_surface, proprete_mm, statut, cree_le)
     VALUES (?, 'kobra-1', 15, 3, 0.2, 'attente', ?)`).run(client, now).lastInsertRowid;
   db.prepare('INSERT INTO devis_pieces (devis_id, fichier_id, quantite) VALUES (?, ?, 1)').run(idChampignon, fichierChampignon);
+  const idCroix = db.prepare(`INSERT INTO devis (client_id, imprimante_id, remplissage_pct, couches_surface, proprete_mm, statut, cree_le)
+    VALUES (?, 'kobra-1', 15, 3, 0.2, 'attente', ?)`).run(client, now).lastInsertRowid;
+  db.prepare('INSERT INTO devis_pieces (devis_id, fichier_id, quantite) VALUES (?, ?, 1)').run(idCroix, fichierCroix);
   // le gcode contient-il des supports ? (Orca annonce chaque type de trajet : « ;TYPE:Support »)
   const gcode = (id) => zlib.gunzipSync(fs.readFileSync(decoupeur.fichiers(id).gcode)).toString('latin1');
   const supports = (id) => /^;TYPE:Support/m.test(gcode(id));
@@ -94,7 +105,7 @@ async function main() {
   const debut = Date.now();
   const decoupeur = creerDecoupeur({ config, db, calculerPrix: (p) => ({ prix_matiere_cts: Math.round(p * 20), livraison_cts: 500 }) });
   const statut = (id) => db.prepare('SELECT * FROM devis WHERE id = ?').get(id);
-  while ([...ids, idChampignon].some((id) => ['attente', 'decoupe'].includes(statut(id).statut))) {
+  while ([...ids, idChampignon, idCroix].some((id) => ['attente', 'decoupe'].includes(statut(id).statut))) {
     if (Date.now() - debut > config.orca.delaiMs + 60e3) throw new Error('délai dépassé');
     await new Promise((r) => setTimeout(r, 500));
   }
@@ -132,11 +143,16 @@ async function main() {
       console.error(`[essai-orca]   ÉCHEC : ${objets.length} objet(s) définis dans le gcode au lieu de 2 (piece-1.stl)`);
     }
   }
-  // supports arbre : ajoutés là où la pièce surplombe le vide
+  // orientation automatique : le champignon est retourné (chapeau sur le plateau), donc sans supports
   const c = statut(idChampignon);
   if (c.statut !== 'pret') { ok = false; console.error(`[essai-orca] champignon : ÉCHEC (${c.erreur})`); }
-  else if (!supports(idChampignon)) { ok = false; console.error('[essai-orca] champignon : ÉCHEC, aucun support sous le chapeau'); }
-  else console.log(`[essai-orca] champignon (surplomb) : supports ajoutés -> ${c.poids_g} g, ${c.duree_s} s d'impression`);
+  else if (supports(idChampignon)) { ok = false; console.error('[essai-orca] champignon : ÉCHEC, supports ajoutés (pièce pas retournée par Orca ?)'); }
+  else console.log(`[essai-orca] champignon : retourné par Orca, sans supports -> ${c.poids_g} g, ${c.duree_s} s d'impression`);
+  // supports arbre : ajoutés là où la pièce surplombe le vide dans toutes les positions
+  const x = statut(idCroix);
+  if (x.statut !== 'pret') { ok = false; console.error(`[essai-orca] croix : ÉCHEC (${x.erreur})`); }
+  else if (!supports(idCroix)) { ok = false; console.error('[essai-orca] croix : ÉCHEC, aucun support sous les bras'); }
+  else console.log(`[essai-orca] croix (surplomb) : supports ajoutés -> ${x.poids_g} g, ${x.duree_s} s d'impression`);
   console.log(`[essai-orca] terminé en ${Math.round((Date.now() - debut) / 1000)} s`);
   db.close();
   fs.rmSync(dossier, { recursive: true, force: true });
