@@ -367,6 +367,16 @@ dialog.plaque-valider p { margin: 0; }
 .actions-plaque { white-space: nowrap; }
 .actions-plaque button + button { margin-left: 6px; }
 
+/* ----- réimprimer des pièces choisies (check-list sous le contenu d'une plaque) ----- */
+.plaque-choix { margin-top: 8px; }
+.plaque-choix > summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+.plaque-choix > summary:hover { color: var(--text); }
+.plaque-choix[open] > summary { margin-bottom: 6px; }
+.plaque-choix .tri { max-height: 260px; overflow-y: auto; padding: 8px 10px; background: var(--input);
+  border: 1px solid var(--border); border-radius: 10px; }
+.plaque-choix .objet-ligne input { width: 16px; height: 16px; accent-color: var(--ok); flex: none; }
+.plaque-choix > button { margin-top: 8px; }
+
 /* ----- fichiers rangés par dossier (a_faire, imprimees) ----- */
 .groupe-fichiers { grid-column: 1 / -1; margin: 6px 0 -4px; font-size: 13px; font-weight: 600; color: var(--muted); }
 .groupe-fichiers:first-child { margin-top: 0; }

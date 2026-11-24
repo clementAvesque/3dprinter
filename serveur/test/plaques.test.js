@@ -269,6 +269,39 @@ test('validation pièce par pièce : les exemplaires ratés partent sur une plaq
   assert.ok(imprimees.includes(c));
 });
 
+test('réimpression choisie : les exemplaires cochés partent sur une nouvelle plaque, la plaque de départ ne bouge pas', async () => {
+  const c = commandeValidee('Marilou Milhamont');
+  const devisId = db.prepare('SELECT devis_id FROM commandes WHERE id = ?').get(c).devis_id;
+  const gz = db.prepare('SELECT gcode_chemin FROM devis WHERE id = ?').get(devisId).gcode_chemin;
+  fs.writeFileSync(path.join(dossier, gz), zlib.gzipSync('; Orca\n'
+    + 'EXCLUDE_OBJECT_DEFINE NAME=piece-1.stl_id_0_copy_0 CENTER=100,120 POLYGON=[[90,110],[110,110],[110,130],[90,130]]\n'
+    + 'EXCLUDE_OBJECT_DEFINE NAME=piece-1.stl_id_1_copy_0 CENTER=140,120 POLYGON=[[130,110],[150,110],[150,130],[130,130]]\n'
+    + 'G90\n;LAYER_CHANGE\nG1 X10 Y10 E1\n'));
+  const [p] = plaques.creerPourCommande(c);
+  await attendre(() => plaque(p).statut === 'a_faire');
+
+  await assert.rejects(plaques.refaire(p, []), (e) => e.code === 'aucune_piece');
+  await assert.rejects(plaques.refaire(p, ['inconnu']), (e) => e.code === 'objet_inconnu');
+  await assert.rejects(plaques.refaire(p, 'piece-1.stl_id_0_copy_0'), (e) => e.code === 'objets_invalides');
+
+  // les 2 exemplaires cochés : nouvelle plaque, même pièce d'origine en 2 exemplaires
+  const r = await plaques.refaire(p, ['piece-1.stl_id_0_copy_0', 'piece-1.stl_id_1_copy_0']);
+  assert.equal(r.pieces, 2);
+  const nouvelle = db.prepare('SELECT * FROM lots WHERE reprise_de = ?').get(p);
+  assert.equal(r.reprise, `P${String(nouvelle.id).padStart(4, '0')}`);
+  assert.equal(nouvelle.statut, 'a_envoyer');
+  assert.equal(nouvelle.gcode_chemin, null, 'en attente de la découpe');
+  const interne = db.prepare('SELECT * FROM devis WHERE id = ?').get(nouvelle.devis_reprise_id);
+  assert.equal(interne.reprise, 1);
+  const pieceOrigine = db.prepare('SELECT id FROM devis_pieces WHERE devis_id = ?').get(devisId).id;
+  assert.deepEqual({ ...db.prepare('SELECT quantite, origine_id FROM devis_pieces WHERE devis_id = ?').get(interne.id) },
+    { quantite: 2, origine_id: pieceOrigine });
+  assert.equal(plaques.contenu(nouvelle.id)[0].client_nom, 'Marilou Milhamont', 'fiche de tri de la nouvelle plaque');
+  // contrairement à la validation pièce par pièce, la plaque de départ n'est pas touchée
+  assert.equal(db.prepare('SELECT ratees FROM lot_pieces WHERE lot_id = ?').get(p).ratees, 0, 'aucun exemplaire marqué raté');
+  assert.equal(plaque(p).statut, 'a_faire');
+});
+
 test('commande remboursée : ses plaques pas encore imprimées sont annulées', async () => {
   const c = commandeValidee('Carole');
   hub.lien = null;                                       // pas d'envoi : la plaque reste « a_envoyer »

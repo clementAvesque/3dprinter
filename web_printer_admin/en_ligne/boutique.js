@@ -236,6 +236,73 @@ async function voirGcode(c, devisId) {
 
 // ---------------------------------------------------------------- plaques, factures, clients
 
+// ---- réimprimer des pièces choisies sur une plaque (« je refais juste ce taquet »)
+// Chaque plaque porte une check-list de ses exemplaires (lus dans le gcode) ; dès qu'une case est cochée,
+// un bouton apparaît sous la liste et demande au serveur une nouvelle plaque avec ces seules pièces.
+// La plaque d'origine n'est pas touchée : rien n'est marqué « raté ».
+function listeAReimprimer(p, objets) {
+  const coches = new Set();
+  const liste = document.createElement('div');
+  liste.className = 'tri';
+  objets.forEach((o, i) => {
+    const label = document.createElement('label');
+    label.className = 'objet-ligne';
+    const caseO = document.createElement('input');
+    caseO.type = 'checkbox';
+    caseO.onchange = () => { if (caseO.checked) coches.add(o.nom); else coches.delete(o.nom); maj(); };
+    const pastille = document.createElement('span');
+    pastille.className = 'objet-pastille';
+    pastille.textContent = String(i + 1);
+    const texte = document.createElement('span');
+    texte.textContent = `${o.piece_nom} · n° ${o.exemplaire}${o.client_nom ? ` · ${o.client_nom}` : ''}`;
+    label.append(caseO, pastille, texte);
+    liste.append(label);
+  });
+  const bouton = document.createElement('button');
+  bouton.type = 'button';
+  bouton.className = 'primaire';
+  bouton.onclick = async () => {
+    bouton.disabled = true;
+    const r = await api('POST', B(`/plaques/${p.id}/refaire`), { objets: [...coches] });
+    if (!r.ok) { bouton.disabled = false; return toast(texteErreur(r.json), true); }
+    toast(`Nouvelle plaque ${r.json.reprise} : ${r.json.pieces} pièce(s), découpe en cours.`);
+    await chargerPlaques();
+  };
+  function maj() {
+    bouton.hidden = !coches.size;
+    bouton.textContent = `Régénérer une plaque avec ${coches.size} pièce${coches.size > 1 ? 's' : ''}`;
+  }
+  maj();
+  return [liste, bouton];
+}
+
+// bloc dépliable : les exemplaires ne sont demandés au serveur qu'à l'ouverture (une plaque = une requête)
+function choixPieces(p) {
+  const bloc = document.createElement('details');
+  bloc.className = 'plaque-choix';
+  const titre = document.createElement('summary');
+  titre.textContent = 'Réimprimer des pièces…';
+  bloc.append(titre);
+  let charge = false;
+  bloc.addEventListener('toggle', async () => {
+    if (!bloc.open || charge) return;
+    charge = true;
+    const attente = document.createElement('p');
+    attente.className = 'muted small';
+    attente.textContent = 'Lecture des pièces du plateau…';
+    bloc.append(attente);
+    const r = await api('GET', B(`/plaques/${p.id}/objets`));
+    if (!r.ok) {
+      charge = false;
+      attente.className = 'small statut danger';
+      attente.textContent = texteErreur(r.json);
+      return;
+    }
+    attente.replaceWith(...listeAReimprimer(p, r.json.objets));
+  });
+  return bloc;
+}
+
 async function chargerPlaques() {
   const r = await api('GET', B('/plaques'));
   if (!r.ok) return toast(texteErreur(r.json), true);
@@ -250,6 +317,7 @@ async function chargerPlaques() {
       `<td class="nom">${contenu}</td>`, `<td class="small">${echapper(p.fichier || '—')}</td>`,
       `<td><span class="statut ${ton}">${txt}</span>${p.erreur ? `<br><span class="small statut danger">${echapper(p.erreur)}</span>` : ''}</td>`,
       `<td>${duree(p.duree_s)}</td>`, '<td class="actions-plaque"></td>']);
+    tr.querySelector('.nom').append(choixPieces(p));
     const zone = tr.querySelector('.actions-plaque');
     const bouton = (texte, classe, fn) => {
       const b = document.createElement('button');

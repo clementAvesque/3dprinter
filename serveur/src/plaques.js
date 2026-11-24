@@ -355,10 +355,12 @@ function creerPlaques({ config, db, hub, journal, quandImprimee = async () => {}
     return l;
   };
 
-  // pièces ratées d'une plaque -> plaque de reprise : un devis interne (jamais montré au client) avec ces seules
+  // pièces d'une plaque -> plaque de reprise : un devis interne (jamais montré au client) avec ces seules
   // pièces, découpé par Orca (nouveau rangement sur le plateau), puis envoyé dans « a_faire/ » comme les autres.
-  // ratees : Map(pièce d'origine -> nombre d'exemplaires ratés)
-  function creerReprise(l, ratees) {
+  // choisies : Map(pièce d'origine -> nombre d'exemplaires à refaire)
+  // marquerRatees : les exemplaires sont comptés comme ratés sur la plaque d'origine (validation pièce par
+  //   pièce) ; false quand l'admin redemande des pièces à la main : la plaque d'origine ne bouge pas.
+  function creerReprise(l, choisies, { marquerRatees = true, motif = 'reprise' } = {}) {
     const source = db.prepare('SELECT * FROM devis WHERE id = ?').get(devisDecoupe(l));
     const lp = db.prepare('SELECT * FROM lot_pieces WHERE lot_id = ? LIMIT 1').get(l.id);
     const now = Date.now();
@@ -369,17 +371,17 @@ function creerPlaques({ config, db, hub, journal, quandImprimee = async () => {}
         .run(source.client_id, source.imprimante_id, source.remplissage_pct, source.couches_surface, source.proprete_mm, now).lastInsertRowid);
       const id = Number(db.prepare(`INSERT INTO lots (imprimante_id, proprete_mm, statut, cree_le, reprise_de, devis_reprise_id)
         VALUES (?, ?, 'a_envoyer', ?, ?, ?)`).run(l.imprimante_id, l.proprete_mm, now, l.id, devisId).lastInsertRowid);
-      for (const [pieceId, n] of ratees) {
+      for (const [pieceId, n] of choisies) {
         const p = db.prepare('SELECT * FROM devis_pieces WHERE id = ?').get(pieceId);
         db.prepare('INSERT INTO devis_pieces (devis_id, fichier_id, quantite, echelle, origine_id) VALUES (?, ?, ?, ?, ?)')
           .run(devisId, p.fichier_id, n, p.echelle, pieceId);
         db.prepare('INSERT INTO lot_pieces (lot_id, devis_piece_id, quantite, remplissage_pct, couches_surface) VALUES (?, ?, ?, ?, ?)')
           .run(id, pieceId, n, lp?.remplissage_pct ?? source.remplissage_pct, lp?.couches_surface ?? source.couches_surface);
-        db.prepare('UPDATE lot_pieces SET ratees = ? WHERE lot_id = ? AND devis_piece_id = ?').run(n, l.id, pieceId);
+        if (marquerRatees) db.prepare('UPDATE lot_pieces SET ratees = ? WHERE lot_id = ? AND devis_piece_id = ?').run(n, l.id, pieceId);
       }
       db.exec('COMMIT');
-      const total = [...ratees.values()].reduce((a, b) => a + b, 0);
-      journal('boutique.plaque', { cible: numero(id), resultat: 'ok', detail: `reprise de ${numero(l.id)} : ${total} pièce(s), découpe en cours` });
+      const total = [...choisies.values()].reduce((a, b) => a + b, 0);
+      journal('boutique.plaque', { cible: numero(id), resultat: 'ok', detail: `${motif} de ${numero(l.id)} : ${total} pièce(s), découpe en cours` });
       reveillerDecoupe();
       return id;
     } catch (e) {
@@ -439,6 +441,29 @@ function creerPlaques({ config, db, hub, journal, quandImprimee = async () => {}
     return { ...vue(q.plaque.get(l.id)), range, reprise: reprise ? numero(reprise) : null };
   }
 
+  // réimpression à la demande : l'admin coche des exemplaires d'une plaque (onglet Plaques) et en redemande
+  // une nouvelle avec ces seules pièces — « je refais juste ce taquet-là ». Rien n'est marqué « raté » :
+  // la plaque d'origine ne bouge pas, c'est une plaque de plus, découpée par Orca puis envoyée dans « a_faire/ ».
+  // choix : noms des exemplaires voulus, tels que les donne objets() (un nom = un exemplaire sur le plateau).
+  async function refaire(id, choix) {
+    const l = exiger(id);
+    if (l.statut === 'annulee') throw new ErreurPlaque(409, 'statut_incompatible', 'plaque annulée');
+    if (!Array.isArray(choix) || choix.length > 2000 || !choix.every((n) => typeof n === 'string')) {
+      throw new ErreurPlaque(400, 'objets_invalides');
+    }
+    const tous = (await objets(l.id)).objets;
+    const noms = new Set(tous.map((o) => o.nom));
+    if (choix.some((n) => !noms.has(n))) throw new ErreurPlaque(400, 'objet_inconnu');
+    const voulus = new Set(choix);
+    if (!voulus.size) throw new ErreurPlaque(400, 'aucune_piece', 'coche au moins une pièce à réimprimer');
+    // plusieurs exemplaires de la même pièce cochés = une pièce en plusieurs exemplaires sur la nouvelle plaque
+    const choisies = new Map();
+    for (const o of tous) if (voulus.has(o.nom)) choisies.set(o.piece_id, (choisies.get(o.piece_id) || 0) + 1);
+    const nouvelle = creerReprise(l, choisies, { marquerRatees: false, motif: 'pièces redemandées' });
+    setImmediate(() => travail().catch(() => {}));
+    return { ...vue(q.plaque.get(l.id)), reprise: numero(nouvelle), pieces: voulus.size };
+  }
+
   // impression ratée : retour dans « a_faire » ; la relance est possible si la machine est libre
   async function rater(id) {
     const l = exiger(id, 'imprimee');
@@ -488,6 +513,8 @@ function creerPlaques({ config, db, hub, journal, quandImprimee = async () => {}
   // pièces du plateau (pop-up de validation : plateau cliquable)
   routes.get('/:id/objets', repondre((req) => objets(req.params.id)));
   routes.post('/:id/valider', repondre((req) => valider(req.params.id, req.user.id, req.body?.bonnes)));
+  // pièces cochées dans l'onglet Plaques : une nouvelle plaque avec ces seuls exemplaires
+  routes.post('/:id/refaire', repondre((req) => refaire(req.params.id, req.body?.objets)));
   routes.post('/:id/ratee', repondre((req) => rater(req.params.id)));
   routes.post('/:id/lancer', repondre((req) => lancer(req.params.id, req.user.email)));
   routes.post('/:id/renvoyer', repondre(async (req) => {
@@ -504,7 +531,8 @@ function creerPlaques({ config, db, hub, journal, quandImprimee = async () => {}
   }));
 
   return {
-    routes, creerPourCommande, annulerPourCommande, contenu, numero, valider, rater, lancer, travail, surEtat, objets, rattacherReprises,
+    routes, creerPourCommande, annulerPourCommande, contenu, numero, valider, refaire, rater, lancer, travail, surEtat, objets,
+    rattacherReprises,
     // plaques d'une commande (fiche admin, bon de colis)
     deLaCommande: (commandeId) => q.plaquesDe.all(commandeId).map((l) => ({ id: l.id, numero: numero(l.id), statut: l.statut,
       fichier: l.fichier_machine, valide_le: l.valide_le })),
