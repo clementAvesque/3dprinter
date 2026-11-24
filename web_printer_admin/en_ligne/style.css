@@ -376,6 +376,19 @@ dialog.plaque-valider p { margin: 0; }
   border: 1px solid var(--border); border-radius: 10px; }
 .plaque-choix .objet-ligne input { width: 16px; height: 16px; accent-color: var(--ok); flex: none; }
 .plaque-choix > button { margin-top: 8px; }
+/* plateau des pièces choisies : il apparaît dès qu'une case est cochée (couleurs neutres, pas le rouge
+   « raté » de la pop-up de validation : ici une pièce non cochée n'a rien d'anormal) */
+.plaque-choix-vue { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.plaque-choix-vue p { margin: 0; }
+.plaque-choix .plateau-svg { width: 100%; max-width: 230px; max-height: 230px; border-radius: 8px; }
+.plaque-choix .objet polygon, .plaque-choix .objet circle {
+  fill: color-mix(in srgb, var(--muted) 22%, transparent); stroke: var(--muted); }
+.plaque-choix .objet:hover polygon, .plaque-choix .objet:hover circle {
+  fill: color-mix(in srgb, var(--muted) 40%, transparent); }
+.plaque-choix .objet.ok polygon, .plaque-choix .objet.ok circle {
+  fill: color-mix(in srgb, var(--accent) 50%, transparent); stroke: var(--accent); }
+.plaque-choix .objet-num { font-size: 9px; }
+.objet-zone { fill: transparent; }
 
 /* ----- aperçu 3D du STL au survol d'une ligne (apercu-stl.js) ----- */
 .apercu-stl { position: fixed; left: 16px; bottom: 16px; z-index: 40; width: 176px; padding: 8px;

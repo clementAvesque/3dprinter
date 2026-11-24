@@ -241,26 +241,88 @@ async function voirGcode(c, devisId) {
 // Chaque plaque porte une check-list de ses exemplaires (lus dans le gcode) ; dès qu'une case est cochée,
 // un bouton apparaît sous la liste et demande au serveur une nouvelle plaque avec ces seules pièces.
 // La plaque d'origine n'est pas touchée : rien n'est marqué « raté ».
-function listeAReimprimer(p, objets) {
+const SVG = 'http://www.w3.org/2000/svg';
+const svgEl = (tag, attrs = {}) => {
+  const e = document.createElementNS(SVG, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  return e;
+};
+
+// Petit plateau vu de dessus (Y de l'imprimante vers le haut), avec le contour réel de chaque exemplaire
+// lu dans le gcode : les pièces cochées ressortent, les autres restent en gris. Un clic sur une pièce la
+// coche ou la décoche, comme dans la liste. Couleurs dans style.css (pas de style en ligne).
+function miniPlateau(o, coches, basculer) {
+  const [L, H] = o.plateau_mm;
+  const svg = svgEl('svg', { viewBox: `0 0 ${L} ${H}`, class: 'plateau-svg', role: 'img',
+    'aria-label': `Plateau ${L} × ${H} mm, pièces choisies` });
+  svg.append(svgEl('rect', { x: 0, y: 0, width: L, height: H, rx: 4, class: 'plateau-fond' }));
+  for (let g = 50; g < Math.max(L, H); g += 50) {
+    if (g < L) svg.append(svgEl('line', { x1: g, y1: 0, x2: g, y2: H, class: 'plateau-grille' }));
+    if (g < H) svg.append(svgEl('line', { x1: 0, y1: g, x2: L, y2: g, class: 'plateau-grille' }));
+  }
+  const formes = new Map();
+  o.objets.forEach((ob, i) => {
+    if (!ob.centre) return;                      // vieux gcode sans définitions d'objets : pas de contour
+    const groupe = svgEl('g', { class: 'objet' });
+    const forme = ob.polygone?.length > 2
+      ? svgEl('polygon', { points: ob.polygone.map(([x, y]) => `${x},${H - y}`).join(' ') })
+      : svgEl('circle', { cx: ob.centre[0], cy: H - ob.centre[1], r: 8 });
+    const titre = svgEl('title');
+    titre.textContent = `${ob.piece_nom} · n° ${ob.exemplaire}`;
+    // un taquet de 5 mm sur un plateau de 250 fait 4 px de large : zone de clic élargie, et pas de
+    // numéro dessus (il déborderait et on ne le lirait pas)
+    const zone = svgEl('circle', { cx: ob.centre[0], cy: H - ob.centre[1], r: 7, class: 'objet-zone' });
+    const xs = ob.polygone?.map(([x]) => x) ?? [];
+    const ys = ob.polygone?.map(([, y]) => y) ?? [];
+    const large = xs.length > 2 && Math.min(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) >= 14;
+    groupe.append(zone, forme, titre);
+    if (large) {
+      const num = svgEl('text', { x: ob.centre[0], y: H - ob.centre[1], class: 'objet-num' });
+      num.textContent = String(i + 1);
+      groupe.append(num);
+    }
+    groupe.addEventListener('click', () => basculer(ob.nom));
+    svg.append(groupe);
+    formes.set(ob.nom, groupe);
+  });
+  const maj = () => { for (const [nom, g] of formes) g.classList.toggle('ok', coches.has(nom)); };
+  return { svg, maj, vide: !formes.size };
+}
+
+// Check-list des exemplaires + plateau + bouton. Le plateau et le bouton n'apparaissent qu'une fois une
+// pièce cochée : on voit alors tout de suite où elle est posée, ce que son nom de fichier ne dit pas.
+function listeAReimprimer(p, o) {
   const coches = new Set();
+  const cases = new Map();
   const liste = document.createElement('div');
   liste.className = 'tri';
-  objets.forEach((o, i) => {
+  o.objets.forEach((ob, i) => {
     const label = document.createElement('label');
     label.className = 'objet-ligne';
     const caseO = document.createElement('input');
     caseO.type = 'checkbox';
-    caseO.onchange = () => { if (caseO.checked) coches.add(o.nom); else coches.delete(o.nom); maj(); };
+    caseO.onchange = () => basculer(ob.nom, caseO.checked);
     const pastille = document.createElement('span');
     pastille.className = 'objet-pastille';
     pastille.textContent = String(i + 1);
     const texte = document.createElement('span');
-    texte.textContent = `${o.piece_nom} · n° ${o.exemplaire}${o.client_nom ? ` · ${o.client_nom}` : ''}`;
+    texte.textContent = `${ob.piece_nom} · n° ${ob.exemplaire}${ob.client_nom ? ` · ${ob.client_nom}` : ''}`;
     label.append(caseO, pastille, texte);
     // le nom du fichier vient du client et ne veut souvent rien dire : la forme, elle, est sûre
-    brancherApercuStl(label, `${API}/boutique/plaques/${p.id}/pieces/${o.piece_id}/stl`, o.dims_mm, o.piece_nom);
+    brancherApercuStl(label, `${API}/boutique/plaques/${p.id}/pieces/${ob.piece_id}/stl`, ob.dims_mm, ob.piece_nom);
     liste.append(label);
+    cases.set(ob.nom, caseO);
   });
+
+  const plateau = miniPlateau(o, coches, (nom) => basculer(nom));
+  const vue = document.createElement('div');
+  vue.className = 'plaque-choix-vue';
+  vue.hidden = true;
+  if (!plateau.vide) vue.append(plateau.svg);
+  const bilan = document.createElement('p');
+  bilan.className = 'muted small';
+  vue.append(bilan);
+
   const bouton = document.createElement('button');
   bouton.type = 'button';
   bouton.className = 'primaire';
@@ -268,15 +330,29 @@ function listeAReimprimer(p, objets) {
     bouton.disabled = true;
     const r = await api('POST', B(`/plaques/${p.id}/refaire`), { objets: [...coches] });
     if (!r.ok) { bouton.disabled = false; return toast(texteErreur(r.json), true); }
-    toast(`Nouvelle plaque ${r.json.reprise} : ${r.json.pieces} pièce(s), découpe en cours.`);
+    toast(`Nouvelle plaque ${r.json.reprise} : ${r.json.pieces} pièce${r.json.pieces > 1 ? 's' : ''}, découpe en cours.`);
     await chargerPlaques();
   };
+
+  function basculer(nom, force) {
+    const oui = force ?? !coches.has(nom);
+    if (oui) coches.add(nom); else coches.delete(nom);
+    maj();
+  }
   function maj() {
-    bouton.hidden = !coches.size;
-    bouton.textContent = `Régénérer une plaque avec ${coches.size} pièce${coches.size > 1 ? 's' : ''}`;
+    for (const [nom, c] of cases) c.checked = coches.has(nom);
+    plateau.maj();
+    const n = coches.size;
+    vue.hidden = !n;
+    bouton.hidden = !n;
+    const pieces = `${n} pièce${n > 1 ? 's' : ''}`;
+    bilan.textContent = plateau.vide
+      ? `${pieces} choisie${n > 1 ? 's' : ''} — ce gcode ne dit pas où elles sont posées sur le plateau.`
+      : `${pieces} en bleu sur le plateau ; clique une pièce pour l'ajouter ou l'enlever.`;
+    bouton.textContent = `Régénérer une plaque avec ${n} pièce${n > 1 ? 's' : ''}`;
   }
   maj();
-  return [liste, bouton];
+  return [liste, vue, bouton];
 }
 
 // bloc dépliable : les exemplaires ne sont demandés au serveur qu'à l'ouverture (une plaque = une requête)
@@ -301,7 +377,7 @@ function choixPieces(p) {
       attente.textContent = texteErreur(r.json);
       return;
     }
-    attente.replaceWith(...listeAReimprimer(p, r.json.objets));
+    attente.replaceWith(...listeAReimprimer(p, r.json));
   });
   return bloc;
 }
