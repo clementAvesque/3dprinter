@@ -1,11 +1,11 @@
 // Service worker de la PWA admin : rend l'application installable et garde ses fichiers pour un
 // démarrage rapide. L'API (/api/...) n'est JAMAIS mise en cache : état des machines, commandes et
 // sessions viennent toujours du serveur.
-const VERSION = 'admin-v5';
+const VERSION = 'admin-v6';
 const FICHIERS = [
   'index.html', 'suivi.html', 'galerie.html', 'boutique.html', 'bon.html', 'profil.html', 'connexion.html',
   'style.css', 'config.js', 'commun.js', 'machine.js', 'filament.js', 'app.js', 'suivi.js', 'galerie.js',
-  'boutique.js', 'bon.js', 'profil.js', 'connexion.js', 'apercu3d.js',
+  'boutique.js', 'bon.js', 'profil.js', 'connexion.js', 'apercu3d.js', 'apercu-stl.js',
   'vendor/three/three.module.min.js', 'vendor/three/OrbitControls.js', 'vendor/three/STLLoader.js',
   'manifest.webmanifest', 'icones/icone.svg', 'icones/icone-192.png', 'icones/icone-512.png',
 ];

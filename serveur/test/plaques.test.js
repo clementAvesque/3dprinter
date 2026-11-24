@@ -302,6 +302,25 @@ test('réimpression choisie : les exemplaires cochés partent sur une nouvelle p
   assert.equal(plaque(p).statut, 'a_faire');
 });
 
+test('aperçu 3D : le STL rendu appartient bien à la plaque, les autres pièces sont refusées', async () => {
+  const c = commandeValidee('Sacha Petit');
+  const [p] = plaques.creerPourCommande(c);
+  await attendre(() => plaque(p).statut === 'a_faire');
+  const devisId = db.prepare('SELECT devis_id FROM commandes WHERE id = ?').get(c).devis_id;
+  const piece = db.prepare('SELECT * FROM devis_pieces WHERE devis_id = ?').get(devisId);
+
+  const f = plaques.stlDePiece(p, piece.id);
+  assert.equal(f.nom, 'piece-1.stl');
+  assert.equal(f.chemin, path.join(dossier, 'stl', 'x.gz'));
+
+  // une pièce qui est sur une autre plaque (ou qui n'existe pas) : rien à montrer
+  assert.throws(() => plaques.stlDePiece(p, piece.id + 1000), (e) => e.code === 'piece_inconnue');
+
+  // droit à l'effacement : la ligne reste pour l'historique, le fichier non
+  db.prepare("UPDATE fichiers_stl SET chemin = '' WHERE id = ?").run(piece.fichier_id);
+  assert.throws(() => plaques.stlDePiece(p, piece.id), (e) => e.code === 'fichier_supprime');
+});
+
 test('commande remboursée : ses plaques pas encore imprimées sont annulées', async () => {
   const c = commandeValidee('Carole');
   hub.lien = null;                                       // pas d'envoi : la plaque reste « a_envoyer »

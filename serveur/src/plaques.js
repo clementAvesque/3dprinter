@@ -128,7 +128,8 @@ function creerPlaques({ config, db, hub, journal, quandImprimee = async () => {}
   async function objets(id) {
     const l = exiger(id);
     const imp = db.prepare('SELECT plateau_x_mm, plateau_y_mm FROM imprimantes WHERE id = ?').get(l.imprimante_id);
-    const pieces = db.prepare(`SELECT p.id, coalesce(p.origine_id, p.id) origine, f.nom_origine nom FROM devis_pieces p
+    const pieces = db.prepare(`SELECT p.id, coalesce(p.origine_id, p.id) origine, f.nom_origine nom, p.echelle,
+        f.dim_x_mm, f.dim_y_mm, f.dim_z_mm FROM devis_pieces p
       JOIN fichiers_stl f ON f.id = p.fichier_id WHERE p.devis_id = ? ORDER BY p.id`).all(devisDecoupe(l) ?? -1);
     // commande et client de chaque pièce d'origine (fiche de tri)
     const proprio = new Map(db.prepare(`SELECT lp.devis_piece_id id, c.uuid, cl.nom FROM lot_pieces lp
@@ -136,7 +137,10 @@ function creerPlaques({ config, db, hub, journal, quandImprimee = async () => {}
       JOIN commandes c ON c.id = cd.commande_id JOIN clients cl ON cl.id = c.client_id WHERE lp.lot_id = ?`).all(l.id).map((r) => [r.id, r]));
     const decrire = (o, piece, exemplaire) => {
       const c = proprio.get(piece.origine);
-      return { ...o, piece_id: piece.origine, piece_nom: piece.nom, exemplaire, commande_ref: ref(c?.uuid), client_nom: c?.nom ?? null };
+      const dims = piece.dim_x_mm == null ? null
+        : [piece.dim_x_mm, piece.dim_y_mm, piece.dim_z_mm].map((v) => Math.round(v * (piece.echelle ?? 1) * 10) / 10);
+      return { ...o, piece_id: piece.origine, piece_nom: piece.nom, dims_mm: dims, exemplaire,
+        commande_ref: ref(c?.uuid), client_nom: c?.nom ?? null };
     };
     const lus = l.gcode_chemin ? await lireObjets(path.join(config.donnees, l.gcode_chemin)).catch(() => []) : [];
     const vus = new Map();
@@ -153,6 +157,18 @@ function creerPlaques({ config, db, hub, journal, quandImprimee = async () => {}
       });
     }
     return { numero: numero(l.id), plateau_mm: [imp?.plateau_x_mm ?? 250, imp?.plateau_y_mm ?? 250], objets: liste };
+  }
+
+  // STL d'une pièce posée sur une plaque : l'admin ne peut pas se fier au nom du fichier (les clients
+  // nomment mal les leurs), il lui faut voir la forme. La pièce doit être sur cette plaque-là : lot_pieces
+  // pointe la pièce d'origine, exactement comme les piece_id rendus par objets().
+  function stlDePiece(id, pieceId) {
+    const l = exiger(id);
+    const f = db.prepare(`SELECT f.chemin, f.nom_origine FROM lot_pieces lp JOIN devis_pieces p ON p.id = lp.devis_piece_id
+      JOIN fichiers_stl f ON f.id = p.fichier_id WHERE lp.lot_id = ? AND lp.devis_piece_id = ?`).get(l.id, Number(pieceId));
+    if (!f) throw new ErreurPlaque(404, 'piece_inconnue');
+    if (!f.chemin) throw new ErreurPlaque(410, 'fichier_supprime', 'le STL du client a été effacé');
+    return { chemin: path.join(config.donnees, f.chemin), nom: f.nom_origine };
   }
 
   // ------------------------------------------------------------ avancement des commandes
@@ -512,6 +528,18 @@ function creerPlaques({ config, db, hub, journal, quandImprimee = async () => {}
   routes.get('/:id', repondre((req) => vue(exiger(req.params.id))));
   // pièces du plateau (pop-up de validation : plateau cliquable)
   routes.get('/:id/objets', repondre((req) => objets(req.params.id)));
+  // STL d'une pièce : aperçu 3D au survol de la liste (identifier une pièce malgré un nom de fichier farfelu)
+  routes.get('/:id/pieces/:pieceId/stl', (req, res) => {
+    let f;
+    try {
+      f = stlDePiece(req.params.id, req.params.pieceId);
+    } catch (e) {
+      if (e instanceof ErreurPlaque) return res.status(e.statut).json({ erreur: e.code, detail: e.detail });
+      throw e;
+    }
+    res.set({ 'Content-Type': 'model/stl', 'Cache-Control': 'private, max-age=600' });
+    fs.createReadStream(f.chemin).pipe(zlib.createGunzip()).on('error', () => res.destroy()).pipe(res);
+  });
   routes.post('/:id/valider', repondre((req) => valider(req.params.id, req.user.id, req.body?.bonnes)));
   // pièces cochées dans l'onglet Plaques : une nouvelle plaque avec ces seuls exemplaires
   routes.post('/:id/refaire', repondre((req) => refaire(req.params.id, req.body?.objets)));
@@ -532,7 +560,7 @@ function creerPlaques({ config, db, hub, journal, quandImprimee = async () => {}
 
   return {
     routes, creerPourCommande, annulerPourCommande, contenu, numero, valider, refaire, rater, lancer, travail, surEtat, objets,
-    rattacherReprises,
+    rattacherReprises, stlDePiece,
     // plaques d'une commande (fiche admin, bon de colis)
     deLaCommande: (commandeId) => q.plaquesDe.all(commandeId).map((l) => ({ id: l.id, numero: numero(l.id), statut: l.statut,
       fichier: l.fichier_machine, valide_le: l.valide_le })),

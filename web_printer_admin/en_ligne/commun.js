@@ -154,7 +154,8 @@ const Plaques = (() => {
   }
 
   // liste à cocher, par commande (client) : la fiche de tri des pièces réussies
-  function listeObjets(o, coches, basculer) {
+  // apercu(ligne, objet) : branche l'aperçu 3D du STL sur la ligne (facultatif, voir montrer())
+  function listeObjets(o, coches, basculer, apercu) {
     const liste = el('div', 'tri');
     const cases = new Map();
     const groupes = new Map();
@@ -171,6 +172,7 @@ const Plaques = (() => {
       caseO.type = 'checkbox';
       caseO.onchange = () => basculer(ob.nom, caseO.checked);
       label.append(caseO, el('span', 'objet-pastille', String(i + 1)), el('span', null, `${ob.piece_nom} · n° ${ob.exemplaire}`));
+      apercu?.(label, ob);
       groupes.get(cle).append(label);
       cases.set(ob.nom, caseO);
     });
@@ -199,7 +201,12 @@ const Plaques = (() => {
       maj();
     };
     const plateau = dessinerPlateau(o, coches, basculer);
-    const liste = listeObjets(o, coches, basculer);
+    // aperçu 3D du STL au survol d'une ligne : le nom du fichier vient du client et ne dit souvent rien.
+    // Chargé à la demande (commun.js est un script classique, apercu-stl.js un module) ; sans lui la liste
+    // marche comme avant.
+    const brancher = await import('./apercu-stl.js').then((m) => m.brancherApercuStl).catch(() => null);
+    const liste = listeObjets(o, coches, basculer, (ligne, ob) => brancher?.(ligne,
+      `${API}/boutique/plaques/${p.id}/pieces/${ob.piece_id}/stl`, ob.dims_mm, ob.piece_nom));
 
     const corps = el('div', 'plaque-corps plaque-pieces');
     if (!plateau.vide) corps.append(plateau.svg);

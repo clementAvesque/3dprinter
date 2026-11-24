@@ -4,6 +4,7 @@
 // envoyé par le navigateur d'un client.
 
 import { Apercu3D } from './apercu3d.js';
+import { brancherApercuStl } from './apercu-stl.js';
 
 const STATUTS = {
   en_attente_paiement: ['attente paiement', ''], abandonnee: ['abandonnée', ''], payee: ['à valider', 'warn'],
@@ -256,6 +257,8 @@ function listeAReimprimer(p, objets) {
     const texte = document.createElement('span');
     texte.textContent = `${o.piece_nom} · n° ${o.exemplaire}${o.client_nom ? ` · ${o.client_nom}` : ''}`;
     label.append(caseO, pastille, texte);
+    // le nom du fichier vient du client et ne veut souvent rien dire : la forme, elle, est sûre
+    brancherApercuStl(label, `${API}/boutique/plaques/${p.id}/pieces/${o.piece_id}/stl`, o.dims_mm, o.piece_nom);
     liste.append(label);
   });
   const bouton = document.createElement('button');

@@ -377,6 +377,17 @@ dialog.plaque-valider p { margin: 0; }
 .plaque-choix .objet-ligne input { width: 16px; height: 16px; accent-color: var(--ok); flex: none; }
 .plaque-choix > button { margin-top: 8px; }
 
+/* ----- aperçu 3D du STL au survol d'une ligne (apercu-stl.js) ----- */
+.apercu-stl { position: fixed; left: 16px; bottom: 16px; z-index: 40; width: 176px; padding: 8px;
+  background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .18); pointer-events: none; }
+.apercu-stl canvas { display: block; width: 160px; height: 160px; }
+.apercu-stl p { margin: 4px 0 0; font-size: 11px; line-height: 1.3; overflow-wrap: anywhere; }
+.apercu-stl-etat { display: grid; place-items: center; min-height: 160px; margin: 0; color: var(--muted); }
+.apercu-stl-nom { font-weight: 600; }
+.apercu-stl-dims { color: var(--muted); }
+.apercu-stl p:empty, .apercu-stl p[hidden] { display: none; }
+
 /* ----- fichiers rangés par dossier (a_faire, imprimees) ----- */
 .groupe-fichiers { grid-column: 1 / -1; margin: 6px 0 -4px; font-size: 13px; font-weight: 600; color: var(--muted); }
 .groupe-fichiers:first-child { margin-top: 0; }
