@@ -355,7 +355,7 @@ dialog.fiche { width: min(1100px, calc(100vw - 32px)); max-width: none; max-heig
 dialog select, dialog input:not(.code) { width: 100%; }
 
 /* ----- plaques : pop-up « impression finie, je valide ? » (commun.js) ----- */
-dialog.plaque-valider { width: min(520px, calc(100vw - 32px)); display: flex; flex-direction: column; gap: 14px; }
+dialog.plaque-valider { width: min(900px, calc(100vw - 32px)); max-width: none; display: flex; flex-direction: column; gap: 14px; }
 dialog.plaque-valider:not([open]) { display: none; }
 dialog.plaque-valider h2 { margin: 0; }
 dialog.plaque-valider p { margin: 0; }
@@ -397,3 +397,22 @@ dialog.plaque-valider p { margin: 0; }
   .bon-outils, .toasts, dialog { display: none !important; }
   .bon { border: 0; margin: 0; padding: 0; max-width: none; }
 }
+
+/* validation pièce par pièce : plateau cliquable + liste à cocher */
+.plaque-pieces { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; max-height: none; overflow: visible; }
+.plaque-liste { display: flex; flex-direction: column; gap: 10px; max-height: 60vh; overflow: auto; min-width: 0; }
+.plateau-svg { width: 100%; max-height: 60vh; display: block; }
+.plateau-fond { fill: var(--input); stroke: var(--border); stroke-width: 1; }
+.plateau-grille { stroke: var(--border); stroke-width: 0.5; }
+.objet { cursor: pointer; }
+.objet polygon, .objet circle { fill: color-mix(in srgb, var(--danger) 30%, transparent); stroke: var(--danger); stroke-width: 1; transition: fill .15s; }
+.objet:hover polygon, .objet:hover circle { fill: color-mix(in srgb, var(--danger) 45%, transparent); }
+.objet.ok polygon, .objet.ok circle { fill: color-mix(in srgb, var(--ok) 45%, transparent); stroke: var(--ok); }
+.objet-num { fill: var(--text); font-size: 8px; font-weight: 700; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+.objet-ligne { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 13px; cursor: pointer; }
+dialog .objet-ligne input { width: 16px; height: 16px; accent-color: var(--ok); flex: none; }
+.objet-pastille { flex: none; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; display: grid; place-items: center;
+  font-size: 11px; font-weight: 700; background: var(--card); border: 1px solid var(--border); }
+.plaque-bilan { padding: 8px 12px; border-radius: 10px; background: var(--input); font-size: 14px; }
+.plaque-bilan.alerte { background: color-mix(in srgb, var(--warn) 14%, transparent); }
+@media (max-width: 720px) { .plaque-pieces { grid-template-columns: minmax(0, 1fr); } }

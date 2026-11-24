@@ -258,6 +258,15 @@ function schemaBoutique(db) {
   ajouterColonne('devis', 'decoupe_debut_le', 'INTEGER');     // début de la découpe : barre de progression du client
   ajouterColonne('devis_pieces', 'echelle', 'REAL NOT NULL DEFAULT 1');   // multiplicateur de taille (STL en mètres...)
 
+  // plaque à moitié réussie : les pièces ratées repartent sur une plaque de reprise. Elle est découpée par Orca
+  // à travers un devis interne (reprise = 1 : jamais montré au client) dont chaque pièce pointe vers la pièce
+  // d'origine (origine_id) ; la plaque de reprise reprend les pièces d'origine (lot_pieces), donc la même commande.
+  ajouterColonne('devis', 'reprise', 'INTEGER NOT NULL DEFAULT 0');
+  ajouterColonne('devis_pieces', 'origine_id', 'INTEGER');
+  ajouterColonne('lots', 'reprise_de', 'INTEGER');               // plaque d'où viennent les pièces à refaire
+  ajouterColonne('lots', 'devis_reprise_id', 'INTEGER');         // devis interne qui la découpe (gcode attendu)
+  ajouterColonne('lot_pieces', 'ratees', 'INTEGER NOT NULL DEFAULT 0');   // exemplaires ratés (repartis en reprise)
+
   // galerie : pseudo public d'un client (unique), projets réalisés publiés par leur auteur, devis créés d'après eux
   ajouterColonne('clients', 'pseudo', 'TEXT');
   ajouterColonne('devis', 'publication_id', 'INTEGER');         // devis créé depuis la galerie (projet d'un autre client)

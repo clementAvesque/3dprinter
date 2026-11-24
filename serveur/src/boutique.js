@@ -74,7 +74,7 @@ function creerBoutique({ config, db, hub, journal, courriel, paiements, clients,
         + 'Le client voit « La découpe a échoué… réessaie plus tard ». Il peut relancer la découpe depuis son devis.');
     } });
   // plaques à imprimer : créées à la validation d'une commande, envoyées dans « a_faire/ » sur l'imprimante
-  const plaques = creerPlaques({ config, db, hub, journal,
+  const plaques = creerPlaques({ config, db, hub, journal, reveillerDecoupe: () => decoupeur.reveiller(),
     quandImprimee: (c) => prevenirClient(c, 'Ta commande est imprimée',
       'Bonne nouvelle : toutes tes pièces sont imprimées et vérifiées. Nous préparons le colis, tu recevras le numéro de suivi à l\'envoi.') });
 
@@ -90,7 +90,7 @@ function creerBoutique({ config, db, hub, journal, courriel, paiements, clients,
     devisDe: db.prepare('SELECT devis_id FROM commande_devis WHERE commande_id = ? ORDER BY devis_id'),
     commandeDuDevis: db.prepare(`SELECT c.* FROM commande_devis cd JOIN commandes c ON c.id = cd.commande_id WHERE cd.devis_id = ?`),
     // côté client, tout passe par l'identifiant public (UUID) et le propriétaire
-    devisDuClient: db.prepare('SELECT * FROM devis WHERE uuid = ? AND client_id = ?'),
+    devisDuClient: db.prepare('SELECT * FROM devis WHERE uuid = ? AND client_id = ? AND reprise = 0'),
     fichierDuClient: db.prepare('SELECT * FROM fichiers_stl WHERE uuid = ? AND client_id = ?'),
     commandeDuClient: db.prepare('SELECT * FROM commandes WHERE uuid = ? AND client_id = ?'),
     adresseDuClient: db.prepare('SELECT * FROM adresses WHERE uuid = ? AND client_id = ?'),
@@ -375,7 +375,7 @@ function creerBoutique({ config, db, hub, journal, courriel, paiements, clients,
       throw e;
     }
   }
-  const devisEnCours = (clientId) => db.prepare("SELECT count(*) n FROM devis WHERE client_id = ? AND statut IN ('attente', 'decoupe')").get(clientId).n;
+  const devisEnCours = (clientId) => db.prepare("SELECT count(*) n FROM devis WHERE client_id = ? AND reprise = 0 AND statut IN ('attente', 'decoupe')").get(clientId).n;
 
   rc.post('/devis', connecte, (req, res) => {
     const { imprimante_id: impId, reglages, pieces, ...reste } = req.body || {};
@@ -431,7 +431,7 @@ function creerBoutique({ config, db, hub, journal, courriel, paiements, clients,
   });
 
   rc.get('/devis', connecte, (req, res) => {
-    res.json(db.prepare('SELECT * FROM devis WHERE client_id = ? ORDER BY id DESC LIMIT 100').all(req.client.id).map(devisComplet));
+    res.json(db.prepare('SELECT * FROM devis WHERE client_id = ? AND reprise = 0 ORDER BY id DESC LIMIT 100').all(req.client.id).map(devisComplet));
   });
 
   rc.get('/devis/:id', connecte, (req, res) => {
@@ -995,7 +995,7 @@ function creerBoutique({ config, db, hub, journal, courriel, paiements, clients,
     clients.purger();
 
     // devis jamais commandés de plus de 30 jours (avec leur gcode), puis STL arrivés à expiration
-    const vieux = db.prepare('SELECT id FROM devis WHERE cree_le < ? AND id NOT IN (SELECT devis_id FROM commande_devis)')
+    const vieux = db.prepare('SELECT id FROM devis WHERE cree_le < ? AND reprise = 0 AND id NOT IN (SELECT devis_id FROM commande_devis)')
       .all(maintenant - B.stlConservationJours * JOUR);
     for (const { id } of vieux) {
       decoupeur.effacer(id);

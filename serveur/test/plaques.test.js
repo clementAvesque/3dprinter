@@ -209,6 +209,66 @@ test('nom déjà pris sur l\'imprimante (base nettoyée, numéros repartis de 1)
   hub.fichiers = null;
 });
 
+test('validation pièce par pièce : les exemplaires ratés partent sur une plaque de reprise (redécoupée), même commande', async () => {
+  const c = commandeValidee('Fanny Durand');
+  // gcode comme celui d'Orca : un objet par exemplaire (2 exemplaires de piece-1), avec contour
+  const devisId = db.prepare('SELECT devis_id FROM commandes WHERE id = ?').get(c).devis_id;
+  const gz = db.prepare('SELECT gcode_chemin FROM devis WHERE id = ?').get(devisId).gcode_chemin;
+  fs.writeFileSync(path.join(dossier, gz), zlib.gzipSync('; Orca\n'
+    + 'EXCLUDE_OBJECT_DEFINE NAME=piece-1.stl_id_0_copy_0 CENTER=100,120 POLYGON=[[90,110],[110,110],[110,130],[90,130]]\n'
+    + 'EXCLUDE_OBJECT_DEFINE NAME=piece-1.stl_id_1_copy_0 CENTER=140,120 POLYGON=[[130,110],[150,110],[150,130],[130,130]]\n'
+    + 'G90\n;LAYER_CHANGE\nG1 X10 Y10 E1\n'));
+  const [p] = plaques.creerPourCommande(c);
+  await attendre(() => plaque(p).statut === 'a_faire');
+  await hub.imprime('PRINTING', 'printing', plaque(p).fichier_machine);
+  await hub.imprime('READY', 'complete', plaque(p).fichier_machine);
+
+  const o = await plaques.objets(p);
+  assert.deepEqual(o.plateau_mm, [250, 250]);
+  assert.deepEqual(o.objets.map((x) => [x.nom, x.piece_nom, x.exemplaire, x.client_nom, x.centre]), [
+    ['piece-1.stl_id_0_copy_0', 'piece-1.stl', 1, 'Fanny Durand', [100, 120]],
+    ['piece-1.stl_id_1_copy_0', 'piece-1.stl', 2, 'Fanny Durand', [140, 120]]]);
+  assert.equal(o.objets[0].polygone.length, 4);
+
+  await assert.rejects(plaques.valider(p, null, []), (e) => e.code === 'aucune_piece');
+  await assert.rejects(plaques.valider(p, null, ['inconnu']), (e) => e.code === 'objet_inconnu');
+
+  // 1 exemplaire sur 2 réussi : plaque validée, l'autre part en reprise (devis interne à découper)
+  const r = await plaques.valider(p, null, ['piece-1.stl_id_0_copy_0']);
+  assert.equal(r.statut, 'validee');
+  const reprise = db.prepare('SELECT * FROM lots WHERE reprise_de = ?').get(p);
+  assert.equal(r.reprise, `P${String(reprise.id).padStart(4, '0')}`);
+  assert.equal(reprise.statut, 'a_envoyer');
+  assert.equal(reprise.gcode_chemin, null, 'en attente de la découpe');
+  assert.deepEqual(r.reprises, [r.reprise]);
+  const interne = db.prepare('SELECT * FROM devis WHERE id = ?').get(reprise.devis_reprise_id);
+  assert.equal(interne.reprise, 1);
+  assert.equal(interne.statut, 'attente');
+  const pieceOrigine = db.prepare('SELECT id FROM devis_pieces WHERE devis_id = ?').get(devisId).id;
+  assert.deepEqual({ ...db.prepare('SELECT quantite, origine_id FROM devis_pieces WHERE devis_id = ?').get(interne.id) },
+    { quantite: 1, origine_id: pieceOrigine });
+  assert.deepEqual({ ...db.prepare('SELECT devis_piece_id, quantite FROM lot_pieces WHERE lot_id = ?').get(reprise.id) },
+    { devis_piece_id: pieceOrigine, quantite: 1 }, 'la reprise reprend la pièce d\'origine (même commande)');
+  assert.equal(db.prepare('SELECT ratees FROM lot_pieces WHERE lot_id = ?').get(p).ratees, 1);
+  assert.equal(plaques.contenu(reprise.id)[0].client_nom, 'Fanny Durand', 'fiche de tri de la reprise');
+  assert.equal(statutCommande(c), 'en_impression', 'pas « imprimée » tant que la reprise n\'est pas faite');
+  assert.ok(!imprimees.includes(c));
+
+  // découpe faite (Orca) : gcode rattaché, plaque envoyée dans « a_faire/ »
+  db.prepare("UPDATE devis SET statut = 'pret', gcode_chemin = ?, duree_s = 300 WHERE id = ?").run(gz, interne.id);
+  plaques.rattacherReprises();
+  await plaques.travail();
+  assert.equal(plaque(reprise.id).statut, 'a_faire');
+  assert.match(plaque(reprise.id).fichier_machine, /^a_faire\/P\d{4}_/);
+
+  // reprise imprimée et validée : la commande est imprimée, le client prévenu
+  await hub.imprime('PRINTING', 'printing', plaque(reprise.id).fichier_machine);
+  await hub.imprime('READY', 'complete', plaque(reprise.id).fichier_machine);
+  await plaques.valider(reprise.id, null);
+  assert.equal(statutCommande(c), 'imprimee');
+  assert.ok(imprimees.includes(c));
+});
+
 test('commande remboursée : ses plaques pas encore imprimées sont annulées', async () => {
   const c = commandeValidee('Carole');
   hub.lien = null;                                       // pas d'envoi : la plaque reste « a_envoyer »

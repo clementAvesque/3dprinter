@@ -37,7 +37,37 @@ const nomFichier = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '
   .replace(/^-+|-+$/g, '').slice(0, 40) || 'client';
 const ref = (uuid) => (uuid ? uuid.slice(0, 8).toUpperCase() : null);
 
-function creerPlaques({ config, db, hub, journal, quandImprimee = async () => {} }) {
+// pièces posées sur un plateau, lues dans l'en-tête du gcode d'Orca :
+//   EXCLUDE_OBJECT_DEFINE NAME=piece-2.stl_id_3_copy_0 CENTER=133.5,127.5 POLYGON=[[128.5,136.5],[128.5,118.2],...]
+// « piece-2.stl » = 2e pièce du devis découpé (src/orca.js), une ligne par exemplaire
+async function lireObjets(chemin) {
+  const objets = [];
+  const flux = fs.createReadStream(chemin).pipe(zlib.createGunzip());
+  let reste = '', lignes = 0;
+  try {
+    for await (const morceau of flux) {
+      const parts = (reste + morceau.toString('latin1')).split('\n');
+      reste = parts.pop();
+      for (const l of parts) {
+        lignes++;
+        const m = /^EXCLUDE_OBJECT_DEFINE NAME=(\S+)(?: CENTER=([-\d.]+),([-\d.]+))?(?: POLYGON=(\[\[.*\]\]))?/.exec(l);
+        if (m) {
+          let polygone = null;
+          try { polygone = m[4] ? JSON.parse(m[4]) : null; } catch { /* polygone illisible : centre seul */ }
+          objets.push({ nom: m[1], centre: m[2] ? [Number(m[2]), Number(m[3])] : null, polygone });
+        } else if (objets.length && !l.startsWith('EXCLUDE_OBJECT_DEFINE')) {
+          return objets;                    // fin du bloc de définitions
+        }
+        if (lignes > 20000) return objets;  // pas de définitions dans l'en-tête
+      }
+    }
+  } finally {
+    flux.destroy();
+  }
+  return objets;
+}
+
+function creerPlaques({ config, db, hub, journal, quandImprimee = async () => {}, reveillerDecoupe = () => {} }) {
   const dossierTmp = path.join(config.donnees, 'uploads');
   fs.mkdirSync(dossierTmp, { recursive: true });
 
@@ -63,7 +93,7 @@ function creerPlaques({ config, db, hub, journal, quandImprimee = async () => {}
 
   function contenu(lotId) {
     const lignes = db.prepare(`SELECT c.id commande_id, c.uuid commande_uuid, cl.nom client_nom, cl.email client_email, d.uuid devis_uuid,
-        f.nom_origine nom, lp.quantite, p.echelle, f.dim_x_mm, f.dim_y_mm, f.dim_z_mm
+        f.nom_origine nom, lp.quantite, lp.ratees, p.echelle, f.dim_x_mm, f.dim_y_mm, f.dim_z_mm
       FROM lot_pieces lp JOIN devis_pieces p ON p.id = lp.devis_piece_id JOIN devis d ON d.id = p.devis_id
       JOIN fichiers_stl f ON f.id = p.fichier_id JOIN commande_devis cd ON cd.devis_id = d.id
       JOIN commandes c ON c.id = cd.commande_id JOIN clients cl ON cl.id = c.client_id
@@ -74,7 +104,7 @@ function creerPlaques({ config, db, hub, journal, quandImprimee = async () => {}
         parCommande.set(l.commande_id, { commande_id: l.commande_id, ref: ref(l.commande_uuid), client_nom: l.client_nom,
           client_email: l.client_email, devis_ref: ref(l.devis_uuid), pieces: [] });
       }
-      parCommande.get(l.commande_id).pieces.push({ nom: l.nom, quantite: l.quantite, echelle: l.echelle,
+      parCommande.get(l.commande_id).pieces.push({ nom: l.nom, quantite: l.quantite, ratees: l.ratees, echelle: l.echelle,
         dims_mm: [l.dim_x_mm, l.dim_y_mm, l.dim_z_mm].map((v) => Math.round(v * l.echelle * 10) / 10) });
     }
     return [...parCommande.values()];
@@ -82,7 +112,48 @@ function creerPlaques({ config, db, hub, journal, quandImprimee = async () => {}
 
   const vue = (l) => ({ id: l.id, numero: numero(l.id), statut: l.statut, imprimante_id: l.imprimante_id, fichier: l.fichier_machine,
     erreur: l.erreur, tentatives: l.tentatives, duree_s: l.duree_s, cree_le: l.cree_le, envoye_le: l.envoye_le, lance_le: l.lance_le,
-    fini_le: l.fini_le, valide_le: l.valide_le, machine_occupee: occupee(l.imprimante_id), contenu: contenu(l.id) });
+    fini_le: l.fini_le, valide_le: l.valide_le, machine_occupee: occupee(l.imprimante_id), contenu: contenu(l.id),
+    // plaque de reprise : d'où viennent ses pièces, et si Orca la découpe encore
+    reprise_de: l.reprise_de ? numero(l.reprise_de) : null, en_decoupe: !l.gcode_chemin && l.statut === 'a_envoyer',
+    reprises: db.prepare('SELECT id FROM lots WHERE reprise_de = ?').all(l.id).map((r) => numero(r.id)) });
+
+  // ------------------------------------------------------------ pièces d'un plateau (validation pièce par pièce)
+
+  // devis découpé pour cette plaque : le devis interne d'une reprise, sinon celui des pièces
+  const devisDecoupe = (l) => l.devis_reprise_id
+    || db.prepare('SELECT p.devis_id FROM lot_pieces lp JOIN devis_pieces p ON p.id = lp.devis_piece_id WHERE lp.lot_id = ? LIMIT 1').get(l.id)?.devis_id;
+
+  // chaque exemplaire posé sur le plateau : nom de l'objet dans le gcode, pièce d'origine, client, contour.
+  // Sans définitions dans le gcode (ancien gcode), une liste sans contour, exemplaire par exemplaire.
+  async function objets(id) {
+    const l = exiger(id);
+    const imp = db.prepare('SELECT plateau_x_mm, plateau_y_mm FROM imprimantes WHERE id = ?').get(l.imprimante_id);
+    const pieces = db.prepare(`SELECT p.id, coalesce(p.origine_id, p.id) origine, f.nom_origine nom FROM devis_pieces p
+      JOIN fichiers_stl f ON f.id = p.fichier_id WHERE p.devis_id = ? ORDER BY p.id`).all(devisDecoupe(l) ?? -1);
+    // commande et client de chaque pièce d'origine (fiche de tri)
+    const proprio = new Map(db.prepare(`SELECT lp.devis_piece_id id, c.uuid, cl.nom FROM lot_pieces lp
+      JOIN devis_pieces p ON p.id = lp.devis_piece_id JOIN commande_devis cd ON cd.devis_id = p.devis_id
+      JOIN commandes c ON c.id = cd.commande_id JOIN clients cl ON cl.id = c.client_id WHERE lp.lot_id = ?`).all(l.id).map((r) => [r.id, r]));
+    const decrire = (o, piece, exemplaire) => {
+      const c = proprio.get(piece.origine);
+      return { ...o, piece_id: piece.origine, piece_nom: piece.nom, exemplaire, commande_ref: ref(c?.uuid), client_nom: c?.nom ?? null };
+    };
+    const lus = l.gcode_chemin ? await lireObjets(path.join(config.donnees, l.gcode_chemin)).catch(() => []) : [];
+    const vus = new Map();
+    let liste = lus.map((o) => {
+      const piece = pieces[Number(/^piece-(\d+)\.stl/.exec(o.nom)?.[1]) - 1];
+      if (!piece) return null;
+      vus.set(piece.id, (vus.get(piece.id) || 0) + 1);
+      return decrire(o, piece, vus.get(piece.id));
+    }).filter(Boolean);
+    if (!liste.length) {          // pas de contours : un objet par exemplaire, d'après les quantités de la plaque
+      liste = db.prepare('SELECT devis_piece_id, quantite FROM lot_pieces WHERE lot_id = ? ORDER BY id').all(l.id).flatMap((lp) => {
+        const piece = pieces.find((p) => p.origine === lp.devis_piece_id) || { origine: lp.devis_piece_id, nom: '?' };
+        return Array.from({ length: lp.quantite }, (_, k) => decrire({ nom: `piece-${lp.devis_piece_id}-${k + 1}`, centre: null, polygone: null }, piece, k + 1));
+      });
+    }
+    return { numero: numero(l.id), plateau_mm: [imp?.plateau_x_mm ?? 250, imp?.plateau_y_mm ?? 250], objets: liste };
+  }
 
   // ------------------------------------------------------------ avancement des commandes
 
@@ -184,7 +255,8 @@ function creerPlaques({ config, db, hub, journal, quandImprimee = async () => {}
   // à chaque validation et toutes les minutes. Un seul passage à la fois ; une demande pendant un passage
   // en relance un juste après (rien n'est oublié), et la promesse rendue attend la fin du tout.
   async function passe() {
-    for (const l of db.prepare("SELECT * FROM lots WHERE statut = 'a_envoyer' ORDER BY id").all()) {
+    rattacherReprises();
+    for (const l of db.prepare("SELECT * FROM lots WHERE statut = 'a_envoyer' AND gcode_chemin IS NOT NULL ORDER BY id").all()) {
       if (!hub.lien) break;
       if (hub.machine(l.imprimante_id)?.enLigne === false) continue;
       await envoyer(l);
@@ -267,7 +339,7 @@ function creerPlaques({ config, db, hub, journal, quandImprimee = async () => {}
   const auConnecte = (s) => { if (s?.connecte) setTimeout(() => travail().catch(() => {}), 2000); };
   hub.on('evenement', ecouteur);
   hub.on('agent', auConnecte);
-  const minuteur = setInterval(() => travail().catch(() => {}), 60e3);
+  const minuteur = setInterval(() => { rattacherReprises(); travail().catch(() => {}); }, 60e3);
   minuteur.unref?.();
   setImmediate(() => travail().catch(() => {}));
 
@@ -283,9 +355,71 @@ function creerPlaques({ config, db, hub, journal, quandImprimee = async () => {}
     return l;
   };
 
-  // impression bonne : la plaque est rangée dans « imprimees/ » (numéro, date, heure, client), commandes à jour
-  async function valider(id, adminId) {
-    const l = exiger(id, 'imprimee');
+  // pièces ratées d'une plaque -> plaque de reprise : un devis interne (jamais montré au client) avec ces seules
+  // pièces, découpé par Orca (nouveau rangement sur le plateau), puis envoyé dans « a_faire/ » comme les autres.
+  // ratees : Map(pièce d'origine -> nombre d'exemplaires ratés)
+  function creerReprise(l, ratees) {
+    const source = db.prepare('SELECT * FROM devis WHERE id = ?').get(devisDecoupe(l));
+    const lp = db.prepare('SELECT * FROM lot_pieces WHERE lot_id = ? LIMIT 1').get(l.id);
+    const now = Date.now();
+    db.exec('BEGIN');
+    try {
+      const devisId = Number(db.prepare(`INSERT INTO devis (client_id, imprimante_id, remplissage_pct, couches_surface, proprete_mm,
+        statut, cree_le, reprise) VALUES (?, ?, ?, ?, ?, 'attente', ?, 1)`)
+        .run(source.client_id, source.imprimante_id, source.remplissage_pct, source.couches_surface, source.proprete_mm, now).lastInsertRowid);
+      const id = Number(db.prepare(`INSERT INTO lots (imprimante_id, proprete_mm, statut, cree_le, reprise_de, devis_reprise_id)
+        VALUES (?, ?, 'a_envoyer', ?, ?, ?)`).run(l.imprimante_id, l.proprete_mm, now, l.id, devisId).lastInsertRowid);
+      for (const [pieceId, n] of ratees) {
+        const p = db.prepare('SELECT * FROM devis_pieces WHERE id = ?').get(pieceId);
+        db.prepare('INSERT INTO devis_pieces (devis_id, fichier_id, quantite, echelle, origine_id) VALUES (?, ?, ?, ?, ?)')
+          .run(devisId, p.fichier_id, n, p.echelle, pieceId);
+        db.prepare('INSERT INTO lot_pieces (lot_id, devis_piece_id, quantite, remplissage_pct, couches_surface) VALUES (?, ?, ?, ?, ?)')
+          .run(id, pieceId, n, lp?.remplissage_pct ?? source.remplissage_pct, lp?.couches_surface ?? source.couches_surface);
+        db.prepare('UPDATE lot_pieces SET ratees = ? WHERE lot_id = ? AND devis_piece_id = ?').run(n, l.id, pieceId);
+      }
+      db.exec('COMMIT');
+      const total = [...ratees.values()].reduce((a, b) => a + b, 0);
+      journal('boutique.plaque', { cible: numero(id), resultat: 'ok', detail: `reprise de ${numero(l.id)} : ${total} pièce(s), découpe en cours` });
+      reveillerDecoupe();
+      return id;
+    } catch (e) {
+      db.exec('ROLLBACK');
+      throw e;
+    }
+  }
+
+  // plaques de reprise : gcode rattaché dès que le devis interne est découpé (ou erreur de découpe affichée)
+  function rattacherReprises() {
+    for (const l of db.prepare(`SELECT l.id, d.statut, d.erreur, d.gcode_chemin, d.duree_s FROM lots l JOIN devis d ON d.id = l.devis_reprise_id
+      WHERE l.gcode_chemin IS NULL AND l.statut = 'a_envoyer'`).all()) {
+      if (l.statut === 'pret' && l.gcode_chemin) {
+        db.prepare('UPDATE lots SET gcode_chemin = ?, duree_s = ?, erreur = NULL WHERE id = ?').run(l.gcode_chemin, l.duree_s, l.id);
+        journal('boutique.plaque', { cible: numero(l.id), resultat: 'ok', detail: 'reprise découpée' });
+      } else if (l.statut === 'erreur') {
+        db.prepare('UPDATE lots SET erreur = ? WHERE id = ?').run(`découpe : ${l.erreur || 'échec'}`.slice(0, 300), l.id);
+      }
+    }
+  }
+
+  // impression bonne : la plaque est rangée dans « imprimees/ » (numéro, date, heure, client), commandes à jour.
+  // bonnes (facultatif) : noms des exemplaires réussis, cochés sur le plateau ; les autres partent en reprise.
+  async function valider(id, adminId, bonnes) {
+    let l = exiger(id, 'imprimee');
+    let reprise = null;
+    if (bonnes !== undefined) {
+      if (!Array.isArray(bonnes) || bonnes.length > 2000 || !bonnes.every((n) => typeof n === 'string')) {
+        throw new ErreurPlaque(400, 'objets_invalides');
+      }
+      const tous = (await objets(l.id)).objets;
+      const noms = new Set(tous.map((o) => o.nom));
+      if (bonnes.some((n) => !noms.has(n))) throw new ErreurPlaque(400, 'objet_inconnu');
+      const ok = new Set(bonnes);
+      if (!ok.size) throw new ErreurPlaque(409, 'aucune_piece', 'aucune pièce réussie : la plaque est à refaire (« ratée »)');
+      const ratees = new Map();
+      for (const o of tous) if (!ok.has(o.nom)) ratees.set(o.piece_id, (ratees.get(o.piece_id) || 0) + 1);
+      l = exiger(id, 'imprimee');              // pas validée entre-temps (deux onglets)
+      if (ratees.size) reprise = creerReprise(l, ratees);
+    }
     const c = contenu(l.id);
     const qui = c.length === 1 ? nomFichier(c[0].client_nom) : `${c.length}-clients`;
     const { jour, heure } = dateParis(Date.now());
@@ -301,7 +435,8 @@ function creerPlaques({ config, db, hub, journal, quandImprimee = async () => {}
         db.prepare('UPDATE lots SET erreur = ? WHERE id = ?').run(`rangement : ${e.detail || e.message}`.slice(0, 300), l.id);
       }
     }
-    return { ...vue(q.plaque.get(l.id)), range };
+    if (reprise) setImmediate(() => travail().catch(() => {}));
+    return { ...vue(q.plaque.get(l.id)), range, reprise: reprise ? numero(reprise) : null };
   }
 
   // impression ratée : retour dans « a_faire » ; la relance est possible si la machine est libre
@@ -350,17 +485,26 @@ function creerPlaques({ config, db, hub, journal, quandImprimee = async () => {}
   // plaques imprimées en attente de la validation de l'admin (pop-up sur toutes les pages)
   routes.get('/a-valider', repondre(() => db.prepare("SELECT * FROM lots WHERE statut = 'imprimee' ORDER BY fini_le").all().map(vue)));
   routes.get('/:id', repondre((req) => vue(exiger(req.params.id))));
-  routes.post('/:id/valider', repondre((req) => valider(req.params.id, req.user.id)));
+  // pièces du plateau (pop-up de validation : plateau cliquable)
+  routes.get('/:id/objets', repondre((req) => objets(req.params.id)));
+  routes.post('/:id/valider', repondre((req) => valider(req.params.id, req.user.id, req.body?.bonnes)));
   routes.post('/:id/ratee', repondre((req) => rater(req.params.id)));
   routes.post('/:id/lancer', repondre((req) => lancer(req.params.id, req.user.email)));
   routes.post('/:id/renvoyer', repondre(async (req) => {
-    exiger(req.params.id, 'a_envoyer');
+    const l = exiger(req.params.id, 'a_envoyer');
+    // reprise dont la découpe a échoué : relancée
+    if (l.devis_reprise_id) {
+      db.prepare("UPDATE devis SET statut = 'attente', erreur = NULL WHERE id = ? AND statut = 'erreur'").run(l.devis_reprise_id);
+      db.prepare('UPDATE lots SET erreur = NULL WHERE id = ?').run(l.id);
+      reveillerDecoupe();
+    }
+    rattacherReprises();
     await travail();
     return vue(q.plaque.get(Number(req.params.id)));
   }));
 
   return {
-    routes, creerPourCommande, annulerPourCommande, contenu, numero, valider, rater, lancer, travail, surEtat,
+    routes, creerPourCommande, annulerPourCommande, contenu, numero, valider, rater, lancer, travail, surEtat, objets, rattacherReprises,
     // plaques d'une commande (fiche admin, bon de colis)
     deLaCommande: (commandeId) => q.plaquesDe.all(commandeId).map((l) => ({ id: l.id, numero: numero(l.id), statut: l.statut,
       fichier: l.fichier_machine, valide_le: l.valide_le })),

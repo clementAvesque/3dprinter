@@ -125,6 +125,12 @@ async function main() {
     if (!/^M106 S255/m.test(gcode(id))) { ok = false; console.error('[essai-orca]   ÉCHEC : ventilateur jamais à 100 %'); }
     if (plateau(id) !== 60) { ok = false; console.error(`[essai-orca]   ÉCHEC : plateau à ${plateau(id)} °C au lieu de 60 °C`); }
     if (supports(id)) { ok = false; console.error('[essai-orca]   ÉCHEC : supports ajoutés à un cube qui n\'en a pas besoin'); }
+    // un objet par exemplaire, nommé d'après le STL (validation pièce par pièce des plaques, src/plaques.js)
+    const objets = [...gcode(id).matchAll(/^EXCLUDE_OBJECT_DEFINE NAME=(piece-\d+\.stl)\S* CENTER=[-\d.]+,[-\d.]+ POLYGON=\[\[/gm)];
+    if (objets.length !== 2 || objets.some((m) => m[1] !== 'piece-1.stl')) {
+      ok = false;
+      console.error(`[essai-orca]   ÉCHEC : ${objets.length} objet(s) définis dans le gcode au lieu de 2 (piece-1.stl)`);
+    }
   }
   // supports arbre : ajoutés là où la pièce surplombe le vide
   const c = statut(idChampignon);

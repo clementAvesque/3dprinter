@@ -240,10 +240,13 @@ async function chargerPlaques() {
   const r = await api('GET', B('/plaques'));
   if (!r.ok) return toast(texteErreur(r.json), true);
   remplir('t-plaques', r.json.map((p) => {
-    const [txt, ton] = STATUTS_PLAQUE[p.statut] || [p.statut, ''];
+    const [txt, ton] = p.en_decoupe ? ['reprise · découpe en cours', 'accent'] : STATUTS_PLAQUE[p.statut] || [p.statut, ''];
+    const liens = [p.reprise_de ? `reprise de ${p.reprise_de}` : null, p.reprises?.length ? `ratées refaites sur ${p.reprises.join(', ')}` : null]
+      .filter(Boolean).join(' · ');
     const contenu = p.contenu.map((c) => `<b>${echapper(c.ref)}</b> · ${echapper(c.client_nom)}<br><span class="muted small">`
-      + `${c.pieces.map((pc) => `${echapper(pc.nom)} × ${pc.quantite}`).join(', ')}</span>`).join('<br>') || '—';
-    const tr = ligne([`<td><b>${echapper(p.numero)}</b>${p.tentatives > 1 ? `<br><span class="muted small">${p.tentatives} essais</span>` : ''}</td>`,
+      + `${c.pieces.map((pc) => `${echapper(pc.nom)} × ${pc.quantite}${pc.ratees ? ` (${pc.ratees} ratée${pc.ratees > 1 ? 's' : ''})` : ''}`).join(', ')}</span>`).join('<br>') || '—';
+    const tr = ligne([`<td><b>${echapper(p.numero)}</b>${p.tentatives > 1 ? `<br><span class="muted small">${p.tentatives} essais</span>` : ''}`
+      + `${liens ? `<br><span class="muted small">${echapper(liens)}</span>` : ''}</td>`,
       `<td class="nom">${contenu}</td>`, `<td class="small">${echapper(p.fichier || '—')}</td>`,
       `<td><span class="statut ${ton}">${txt}</span>${p.erreur ? `<br><span class="small statut danger">${echapper(p.erreur)}</span>` : ''}</td>`,
       `<td>${duree(p.duree_s)}</td>`, '<td class="actions-plaque"></td>']);
