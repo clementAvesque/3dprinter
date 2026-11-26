@@ -698,3 +698,30 @@ test('pièce presque aussi grande que le plateau : refusée avant la découpe (b
   assert.equal(ok.statut, 201, '229 mm : acceptée');
   await devisDecoupe(c, ok.json.id);
 });
+
+test('suppression du compte : le devis rattaché à une commande impayée est effacé lui aussi, sans orphelin', async () => {
+  const c = await clientDirect('orphelin@test.local');
+  const reglages = { remplissage_pct: 15, couches_surface: 3, proprete: 'fine' };
+  const f = await c.req('POST', '/fichiers', envoiStl('cube.stl', cube(20)));
+  const d = await devisDecoupe(c, (await c.req('POST', '/devis', { imprimante_id: 'kobra-1', reglages,
+    pieces: [{ fichier_id: f.json.id, quantite: 1 }] })).json.id);
+  assert.equal(d.statut, 'pret', d.erreur);
+  const devisId = interne('devis', d.id);
+  const clientId = srv.db.prepare('SELECT id FROM clients WHERE email = ?').get('orphelin@test.local').id;
+
+  // commande laissée impayée : le déclencheur commande_devis_premier rattache le devis à la commande
+  const cmd = Number(srv.db.prepare(`INSERT INTO commandes (client_id, devis_id, livraison_nom, livraison_adresse,
+    sous_total_cts, livraison_cts, total_cts, cree_le) VALUES (?, ?, 'Test', '{"ville":"Paris"}', 100, 500, 600, ?)`)
+    .run(clientId, devisId, Date.now()).lastInsertRowid);
+  assert.ok(srv.db.prepare('SELECT 1 FROM commande_devis WHERE devis_id = ?').get(devisId), 'devis rattaché à la commande');
+  const gcode = path.join(srv.config.donnees, srv.db.prepare('SELECT gcode_chemin FROM devis WHERE id = ?').get(devisId).gcode_chemin);
+  assert.ok(fs.existsSync(gcode), 'gcode présent avant la suppression');
+
+  // la commande impayée est supprimée d'abord : le devis ne doit pas échapper à l'effacement pour autant
+  assert.equal((await c.req('DELETE', '/moi', { motdepasse: 'un-mot-de-passe-solide' })).statut, 200);
+  assert.ok(!srv.db.prepare('SELECT 1 FROM commandes WHERE id = ?').get(cmd), 'commande impayée supprimée');
+  assert.ok(!srv.db.prepare('SELECT 1 FROM devis WHERE id = ?').get(devisId), 'devis effacé avec le compte');
+  assert.ok(!fs.existsSync(gcode), 'gcode effacé du disque');
+  // aucune commande ne retient la ligne : elle part pour de bon, pas de coquille « Compte supprimé »
+  assert.ok(!srv.db.prepare('SELECT 1 FROM clients WHERE id = ?').get(clientId), 'ligne du client effacée');
+});

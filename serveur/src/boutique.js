@@ -789,20 +789,42 @@ function creerBoutique({ config, db, hub, journal, courriel, paiements, clients,
       .get(c.id, ...STATUTS_EN_COURS);
     if (enCours) return res.status(409).json({ erreur: 'commande_en_cours', detail: 'attends la livraison de ta commande' });
     const now = Date.now();
-    const libres = db.prepare('SELECT id FROM devis WHERE client_id = ? AND id NOT IN (SELECT devis_id FROM commande_devis)').all(c.id);
     const fichiers = db.prepare("SELECT * FROM fichiers_stl WHERE client_id = ? AND chemin != ''").all(c.id);
+    let libres = [];
     db.exec('BEGIN');
     try {
       db.prepare('UPDATE publications SET retiree_le = ? WHERE client_id = ? AND retiree_le IS NULL').run(now, c.id);
       for (const { id } of db.prepare("SELECT id FROM commandes WHERE client_id = ? AND statut IN ('en_attente_paiement', 'abandonnee')").all(c.id)) {
         supprimerCommandeNonPayee(id);
       }
+      // les devis à effacer sont listés APRÈS la suppression des commandes impayées : listés avant, un devis
+      // rattaché à l'une d'elles était exclu de la liste, puis restait en base avec son gcode sur le disque
+      // quand sa commande disparaissait (constaté le 25/11 sur le devis 11 d'un compte supprimé).
+      libres = db.prepare('SELECT id FROM devis WHERE client_id = ? AND id NOT IN (SELECT devis_id FROM commande_devis)').all(c.id);
       for (const { id } of libres) db.prepare('DELETE FROM devis WHERE id = ?').run(id);
       db.prepare('DELETE FROM adresses WHERE client_id = ?').run(c.id);
       db.prepare('DELETE FROM jetons_email WHERE client_id = ?').run(c.id);
       db.prepare('DELETE FROM sessions_client WHERE client_id = ?').run(c.id);
-      db.prepare(`UPDATE clients SET email = ?, nom = 'Compte supprimé', pseudo = NULL, hash = '!', actif = 0, email_verifie = 0
-        WHERE id = ?`).run(`supprime-${crypto.randomUUID()}@compte-supprime.invalid`, c.id);
+      // la ligne du client part pour de bon quand plus rien ne la retient : tout le reste est en ON DELETE
+      // CASCADE. Deux cas obligent à garder une coquille anonyme : une commande (commandes.client_id n'a pas
+      // de cascade, obligation comptable), et un fichier encore utilisé par le devis d'un autre client (projet
+      // ouvert depuis la galerie), qui ferait échouer la cascade sur devis_pieces.fichier_id. Le SAVEPOINT
+      // rattrape ce second cas sans perdre la transaction, et couvre les contraintes à venir (25/11).
+      const anonymiser = () => db.prepare(`UPDATE clients SET email = ?, nom = 'Compte supprimé', pseudo = NULL,
+        hash = '!', actif = 0, email_verifie = 0 WHERE id = ?`).run(`supprime-${crypto.randomUUID()}@compte-supprime.invalid`, c.id);
+      if (db.prepare('SELECT 1 FROM commandes WHERE client_id = ? LIMIT 1').get(c.id)) {
+        anonymiser();
+      } else {
+        db.exec('SAVEPOINT effacement_client');
+        try {
+          db.prepare('DELETE FROM clients WHERE id = ?').run(c.id);
+          db.exec('RELEASE effacement_client');
+        } catch {
+          db.exec('ROLLBACK TO effacement_client');
+          db.exec('RELEASE effacement_client');
+          anonymiser();
+        }
+      }
       db.exec('COMMIT');
     } catch (e) {
       db.exec('ROLLBACK');

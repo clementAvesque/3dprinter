@@ -59,21 +59,23 @@ REGLAGES = {
             # Orca en ligne de commande prend le « Cool Plate » par défaut : plateau à 35 °C, mauvaise adhérence.
             "curr_bed_type": "Textured PEI Plate",
             # ---- pratiques du « HS PLA Speed Benchy » d'Anycubic pour la Kobra 3 (PrusaSlicer 2.7.1, impressions
-            # quasi parfaites en PLA Haute Vitesse), vitesses réduites de 20 %. Supports arbre gardés (ci-dessus).
-            # vitesses (Benchy x 0,8) : paroi externe 380 -> 304, parois internes et remplissage 600 -> 480,
-            # remplissage plein 360 -> 288, dessus et petits trous 300 -> 240, 1re couche 200 -> 160 mm/s
-            "outer_wall_speed": "304",
-            "inner_wall_speed": "480",
-            "sparse_infill_speed": "480",
-            "internal_solid_infill_speed": "288",
-            "top_surface_speed": "240",
-            "gap_infill_speed": "240",
-            "initial_layer_speed": "160",
-            "initial_layer_infill_speed": "160",
-            "bridge_speed": "160",
-            "support_speed": "120",
-            "skirt_speed": "160",
-            "travel_speed": "480",
+            # quasi parfaites en PLA Haute Vitesse), vitesses réduites de 36 %. Supports arbre gardés (ci-dessus).
+            # vitesses (Benchy x 0,64 : -20 % du Benchy, puis -20 % de plus le 25/11 contre sous-extrusion,
+            # fils d'ange et decalages de couche) : paroi externe 380 -> 243, parois internes et remplissage
+            # 600 -> 384, remplissage plein 360 -> 230, dessus et petits trous 300 -> 192,
+            # 1re couche 200 -> 128, deplacements 600 -> 384 mm/s
+            "outer_wall_speed": "243",
+            "inner_wall_speed": "384",
+            "sparse_infill_speed": "384",
+            "internal_solid_infill_speed": "230",
+            "top_surface_speed": "192",
+            "gap_infill_speed": "192",
+            "initial_layer_speed": "128",
+            "initial_layer_infill_speed": "128",
+            "bridge_speed": "128",
+            "support_speed": "96",
+            "skirt_speed": "128",
+            "travel_speed": "384",
             "small_perimeter_speed": "95%",          # 360 / 380 dans le Benchy
             "internal_bridge_speed": "100%",
             "support_interface_speed": "100%",
@@ -84,9 +86,14 @@ REGLAGES = {
                                     "sparse_infill_acceleration", "internal_solid_infill_acceleration",
                                     "top_surface_acceleration", "bridge_acceleration", "travel_acceleration")},
             "initial_layer_acceleration": "1000",
-            # parois externes d'abord (meilleur aspect), couture alignée, 2 parois, remplissage en lignes
+            # parois externes d'abord (meilleur aspect), 2 parois, remplissage en lignes.
+            # ESSAI du 25/11 (trous aux angles) : couture au hasard au lieu d'alignée pour voir si les trous
+            # se répartissent, et plus d'espace à la fermeture du tour (seam_gap 10 % -> 0). À remettre à
+            # "aligned" / "10%" si la couture n'est pas la cause : au hasard, c'est plus laid.
             "wall_sequence": "outer wall/inner wall",
-            "seam_position": "aligned",
+            "seam_position": "random",
+            "seam_gap": "0%",
+            "seam_slope_type": "none",   # scarf seam laissée désactivée pour isoler le problème
             "wall_loops": "2",
             "sparse_infill_pattern": "zig-zag",
             "infill_wall_overlap": "15%",
@@ -99,14 +106,15 @@ REGLAGES = {
             "initial_layer_line_width": "0.5",
             "initial_layer_print_height": "0.23",
         },
-        # PLA Haute Vitesse du Benchy : 240 °C (1re couche comprise), débit max 35 mm³/s -> 28 (-20 %),
+        # PLA Haute Vitesse du Benchy : 225 °C (1re couche comprise), débit max 35 mm³/s -> 22 (-37 %,
+        # abaisse avec les vitesses le 25/11 : a 225 °C la buse ne fait plus fondre 28 mm³/s),
         # débit x1,02, ventilateur coupé sur les 2 premières couches puis 100 % dès la 3e.
         # Gardé malgré le Benchy (qui l'a désactivé) : petites couches ralenties pour refroidir (choix du 22/11).
         "filament": {
-            "nozzle_temperature": ["240"],
-            "nozzle_temperature_initial_layer": ["240"],
+            "nozzle_temperature": ["225"],
+            "nozzle_temperature_initial_layer": ["225"],
             "nozzle_temperature_range_high": ["250"],
-            "filament_max_volumetric_speed": ["28"],
+            "filament_max_volumetric_speed": ["22"],
             "filament_flow_ratio": ["1.02"],
             "close_fan_the_first_x_layers": ["2"],
             "full_fan_speed_layer": ["3"],
@@ -114,9 +122,12 @@ REGLAGES = {
             "fan_max_speed": ["100"],
         },
         # rétraction du Benchy : 0,4 mm à 160 mm/s, sans levée de buse ni essuyage, pas de rétraction au
-        # changement de couche, seulement pour les déplacements de plus de 2 mm
+        # changement de couche, seulement pour les déplacements de plus de 2 mm.
+        # Longueur gardée à 0,4 (déjà très court en direct drive) ; 0,05 mm redonné à la reprise le 25/11
+        # pour combler les trous aux angles sans toucher à la rétraction.
         "machine": {
             "retraction_length": ["0.4"],
+            "retract_restart_extra": ["0.05"],
             "retraction_speed": ["160"],
             "deretraction_speed": ["160"],
             "z_hop": ["0"],

@@ -96,7 +96,7 @@ async function main() {
     }
     return couches;
   };
-  // buse : 240 °C (PLA Haute Vitesse) dès le démarrage (G9111 de la Kobra 3) et à chaque changement (M104/M109), 0 à la fin
+  // buse : 225 °C (PLA Haute Vitesse) dès le démarrage (G9111 de la Kobra 3) et à chaque changement (M104/M109), 0 à la fin
   const buses = (id) => {
     const g = gcode(id);
     return [...g.matchAll(/^G9111 .*extruderTemp=(\d+)/gm), ...g.matchAll(/^M10[49] S(\d+)/gm)].map((m) => Number(m[1])).filter((t) => t !== 0);
@@ -123,14 +123,14 @@ async function main() {
       console.error('[essai-orca]   ÉCHEC : pièces mal rangées (superposées ou hors du plateau)');
     }
     const b = buses(id);
-    if (!b.length || b.some((t) => t !== 240)) { ok = false; console.error(`[essai-orca]   ÉCHEC : buse à ${b.join(', ')} °C au lieu de 240 °C`); }
+    if (!b.length || b.some((t) => t !== 225)) { ok = false; console.error(`[essai-orca]   ÉCHEC : buse à ${b.join(', ')} °C au lieu de 225 °C`); }
     else console.log(`[essai-orca]   plateau ${plateau(id)} °C, buse ${b[0]} °C`);
-    // vitesses du Benchy -20 % : 1re couche 160 mm/s au plus, le reste 480 au plus
+    // vitesses du Benchy -36 % : 1re couche 128 mm/s au plus, le reste 384 au plus
     const v = vitesses(id);
     const max1 = Math.max(...v[0]), max = Math.max(...v.flatMap((s) => [...s]));
-    if (max1 > 160 || max > 480) {
+    if (max1 > 128 || max > 384) {
       ok = false;
-      console.error(`[essai-orca]   ÉCHEC : 1re couche jusqu'à ${max1} mm/s (160 max), reste jusqu'à ${max} mm/s (480 max)`);
+      console.error(`[essai-orca]   ÉCHEC : 1re couche jusqu'à ${max1} mm/s (128 max), reste jusqu'à ${max} mm/s (384 max)`);
     } else console.log(`[essai-orca]   vitesses : 1re couche jusqu'à ${max1} mm/s, ensuite jusqu'à ${max} mm/s`);
     // ventilateur : coupé sur les 2 premières couches, 100 % ensuite
     if (!/^M106 S255/m.test(gcode(id))) { ok = false; console.error('[essai-orca]   ÉCHEC : ventilateur jamais à 100 %'); }
