@@ -330,3 +330,33 @@ test('commande remboursée : ses plaques pas encore imprimées sont annulées', 
   assert.equal(plaque(p).statut, 'annulee');
   hub.lien = {};
 });
+
+test('fichiers de plaques supprimées ou annulées : retirés par l\'agent (imprimante + index), rien d\'autre', async () => {
+  const c = commandeValidee('Gaston');
+  const [p] = plaques.creerPourCommande(c);
+  await attendre(() => plaque(p).statut === 'a_faire');
+  const vivant = plaque(p).fichier_machine;
+  const suppressions = () => hub.appels.filter((a) => a.action === 'file.delete').map((a) => a.params.fichier);
+  const avant = suppressions().length;
+
+  // plaque effacée de la base (P9999) : son fichier part ; le reste ne bouge pas
+  hub.etat.print = { state: 'PRINTING', etat_klipper: 'printing', filename: 'a_faire/P9997_2026-11-27.gcode' };
+  await plaques.surEtat({ machine: 'kobra-1', nom: 'fichiers', donnees: { liste: [
+    { nom: vivant },                                     // plaque vivante
+    { nom: 'a_faire/P9999_2026-11-27.gcode' },           // plaque supprimée : orpheline
+    { nom: 'a_faire/P9997_2026-11-27.gcode' },           // orpheline, mais en cours d'impression
+    { nom: 'a_faire/taquet-P0006.gcode' },               // pas un nom de plaque
+    { nom: 'imprimees/P9998_2026-11-27_10h00_X.gcode' }, // autre dossier (archive)
+    { nom: 'P9996_2026-11-27.gcode' },                   // à la racine
+  ] } });
+  hub.etat.print = { state: 'READY', etat_klipper: 'standby', filename: null };
+  assert.deepEqual(suppressions().slice(avant), ['a_faire/P9999_2026-11-27.gcode']);
+
+  // commande remboursée : la plaque déjà envoyée est annulée et son fichier retiré tout de suite
+  hub.fichiers = [{ nom: vivant }];
+  plaques.annulerPourCommande(c);
+  assert.equal(plaque(p).statut, 'annulee');
+  await attendre(() => suppressions().length > avant + 1);
+  assert.deepEqual(suppressions().slice(avant), ['a_faire/P9999_2026-11-27.gcode', vivant]);
+  hub.fichiers = null;
+});

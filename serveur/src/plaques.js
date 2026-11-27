@@ -218,11 +218,16 @@ function creerPlaques({ config, db, hub, journal, quandImprimee = async () => {}
     return creees;
   }
 
-  // commande remboursée : ses plaques pas encore imprimées sont annulées
+  // commande remboursée : ses plaques pas encore imprimées sont annulées, et leurs fichiers déjà envoyés
+  // retirés de l'imprimante (nettoyage des orphelins à la liste des fichiers suivante, voir surFichiers)
   function annulerPourCommande(commandeId) {
+    const machines = new Set();
     for (const l of q.plaquesDe.all(commandeId)) {
-      if (['a_envoyer', 'a_faire'].includes(l.statut)) q.statut.run('annulee', l.id);
+      if (!['a_envoyer', 'a_faire'].includes(l.statut)) continue;
+      q.statut.run('annulee', l.id);
+      if (l.fichier_machine) machines.add(l.imprimante_id);
     }
+    for (const m of machines) if (hub.lien) hub.rafraichirFichiers(m).catch(() => {});
   }
 
   // ------------------------------------------------------------ envoi dans « a_faire/ » et rangement
@@ -312,11 +317,44 @@ function creerPlaques({ config, db, hub, journal, quandImprimee = async () => {}
     journal('boutique.plaque', { cible: numero(l.id), resultat: 'ok', detail: raison });
   }
 
+  // fichier de plaque orphelin dans « a_faire/ » : « a_faire/P0013_2026-11-27.gcode » dont la plaque n'existe
+  // plus (supprimée de la base) ou est annulée. Il est supprimé PAR L'AGENT (file.delete) : sur l'imprimante
+  // et dans son index, sinon l'admin continue de le montrer (la liste des fichiers vient de l'index de
+  // l'agent, qui garde aussi les plaques effacées de l'imprimante après leur impression).
+  // Jamais touchés : les autres dossiers, les noms sans numéro de plaque, un fichier qu'une plaque encore
+  // vivante utilise (numéros repartis de 1 après un nettoyage de la base), le fichier en cours d'impression.
+  const suppressions = new Set();      // une seule demande à la fois par fichier
+  function orphelins(machine, noms) {
+    const imprime = hub.machine(machine)?.etat?.print?.filename;
+    return [...noms].filter((nom) => {
+      const m = typeof nom === 'string' && /^a_faire\/P(\d+)_[^/]*\.gcode$/.exec(nom);
+      if (!m || nom === imprime || suppressions.has(`${machine}/${nom}`)) return false;
+      const l = q.plaque.get(Number(m[1]));
+      if (l && l.statut !== 'annulee') return false;
+      return !db.prepare("SELECT 1 FROM lots WHERE (fichier_machine = ? OR rangement = ?) AND statut != 'annulee'").get(nom, nom);
+    });
+  }
+  async function supprimerOrphelin(machine, nom) {
+    const cle = `${machine}/${nom}`;
+    suppressions.add(cle);
+    try {
+      const r = await hub.commande(machine, 'file.delete', { fichier: nom }, { user: 'serveur (plaques)' });
+      journal('boutique.plaque', { cible: nom, resultat: r.ok ? 'ok' : 'refuse',
+        detail: r.ok ? 'fichier sans plaque (supprimée ou annulée) : retiré de l\'imprimante' : (r.detail || r.erreur) });
+    } catch (e) {
+      console.error(`[plaques] ${nom} : suppression impossible (${e.detail || e.message})`);
+    } finally {
+      suppressions.delete(cle);
+    }
+  }
+
   // liste des fichiers reçue : les plaques à faire absentes sont renvoyées (pas celles envoyées il y a moins
-  // d'une minute : une liste en retard sur l'envoi ne doit pas les faire repartir)
+  // d'une minute : une liste en retard sur l'envoi ne doit pas les faire repartir), les fichiers de plaques
+  // qui n'existent plus sont supprimés
   async function surFichiers(machine, liste) {
     if (!Array.isArray(liste)) return;
     const noms = new Set(liste.map((f) => f?.nom));
+    for (const nom of orphelins(machine, noms)) await supprimerOrphelin(machine, nom);
     const manquantes = db.prepare("SELECT * FROM lots WHERE imprimante_id = ? AND statut = 'a_faire' AND coalesce(envoye_le, 0) < ?")
       .all(machine, Date.now() - 60e3).filter((l) => !noms.has(l.fichier_machine));
     for (const l of manquantes) {
