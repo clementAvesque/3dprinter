@@ -1036,7 +1036,13 @@ class Printer:
         # 1) imprimante d'abord : si elle ne répond pas, on ne supprime rien du tout
         if sur_imprimante:
             res = self.del_file(nom)
-            if res.get("error") and res.get("error") != "HTTP 404":    # 404 = déjà absent
+            # déjà absent : 404, ou 400 « Invalid file path » pour le Moonraker de Rinkhals (Kobra 3).
+            # Une autre erreur ne compte comme « absent » que si la liste de l'imprimante le confirme.
+            absent = res.get("error") == "HTTP 404"
+            if res.get("error") and not absent:
+                fichiers = self.list_files()
+                absent = isinstance(fichiers, list) and all(f["nom"] != nom for f in fichiers)
+            if res.get("error") and not absent:
                 return {"error": f"suppression sur l'imprimante impossible ({res['error']}) : "
                                  "rien n'a été supprimé"}
             if not res.get("error"):

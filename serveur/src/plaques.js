@@ -324,11 +324,17 @@ function creerPlaques({ config, db, hub, journal, quandImprimee = async () => {}
   // Jamais touchés : les autres dossiers, les noms sans numéro de plaque, un fichier qu'une plaque encore
   // vivante utilise (numéros repartis de 1 après un nettoyage de la base), le fichier en cours d'impression.
   const suppressions = new Set();      // une seule demande à la fois par fichier
+  // suppression refusée par l'agent (ex. ancien agent qui refusait un fichier déjà absent de l'imprimante) :
+  // redemandée au plus une fois par heure, pas à chaque liste reçue
+  const refusees = new Map();          // machine/nom -> date du refus
+  const REESSAI_REFUS_MS = 3600e3;
   function orphelins(machine, noms) {
     const imprime = hub.machine(machine)?.etat?.print?.filename;
     return [...noms].filter((nom) => {
       const m = typeof nom === 'string' && /^a_faire\/P(\d+)_[^/]*\.gcode$/.exec(nom);
-      if (!m || nom === imprime || suppressions.has(`${machine}/${nom}`)) return false;
+      const cle = `${machine}/${nom}`;
+      if (!m || nom === imprime || suppressions.has(cle)) return false;
+      if (Date.now() - (refusees.get(cle) || 0) < REESSAI_REFUS_MS) return false;
       const l = q.plaque.get(Number(m[1]));
       if (l && l.statut !== 'annulee') return false;
       return !db.prepare("SELECT 1 FROM lots WHERE (fichier_machine = ? OR rangement = ?) AND statut != 'annulee'").get(nom, nom);
@@ -339,6 +345,7 @@ function creerPlaques({ config, db, hub, journal, quandImprimee = async () => {}
     suppressions.add(cle);
     try {
       const r = await hub.commande(machine, 'file.delete', { fichier: nom }, { user: 'serveur (plaques)' });
+      if (r.ok) refusees.delete(cle); else refusees.set(cle, Date.now());
       journal('boutique.plaque', { cible: nom, resultat: r.ok ? 'ok' : 'refuse',
         detail: r.ok ? 'fichier sans plaque (supprimée ou annulée) : retiré de l\'imprimante' : (r.detail || r.erreur) });
     } catch (e) {

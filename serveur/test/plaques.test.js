@@ -360,3 +360,13 @@ test('fichiers de plaques supprimées ou annulées : retirés par l\'agent (impr
   assert.deepEqual(suppressions().slice(avant), ['a_faire/P9999_2026-11-27.gcode', vivant]);
   hub.fichiers = null;
 });
+
+test('suppression d\'un fichier orphelin refusée par l\'agent : pas redemandée à chaque liste', async () => {
+  const nom = 'a_faire/P9990_2026-11-27.gcode';
+  const demandes = () => hub.appels.filter((a) => a.action === 'file.delete' && a.params.fichier === nom).length;
+  hub.refuser = 'file.delete';
+  await plaques.surEtat({ machine: 'kobra-1', nom: 'fichiers', donnees: { liste: [{ nom }] } });
+  await plaques.surEtat({ machine: 'kobra-1', nom: 'fichiers', donnees: { liste: [{ nom }] } });
+  hub.refuser = null;
+  assert.equal(demandes(), 1, 'redemandée au plus une fois par heure');
+});
