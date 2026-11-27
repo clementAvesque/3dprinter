@@ -218,9 +218,30 @@ class Hub extends EventEmitter {
     ws.on('error', () => {});
   }
 
-  _fermer(c, code, raison) {
+  // message refusé car trop gros : sa forme (type, événement ou commande, champs les plus lourds), jamais son
+  // contenu, pour savoir quoi corriger dans l'agent
+  _decrireTropGros(data) {
+    let env;
+    try { env = JSON.parse(data.toString('utf8')); } catch { return `${data.length} octets, JSON illisible`; }
+    if (!env || typeof env !== 'object') return `${data.length} octets`;
+    const taille = (v) => Buffer.byteLength(JSON.stringify(v ?? null));
+    const lourds = (o, prefixe = '', profondeur = 0) => Object.entries(o && typeof o === 'object' ? o : {})
+      .flatMap(([k, v]) => {
+        const n = taille(v);
+        if (n < 4096) return [];
+        const enfants = profondeur < 3 ? lourds(v, `${prefixe}${k}.`, profondeur + 1) : [];
+        return enfants.length ? enfants : [`${prefixe}${k}=${n}`];
+      });
+    const action = env.type === 'reponse' ? this.attente.get(env.re)?.action : null;
+    return [`${data.length} octets`, `type=${String(env.type).slice(0, 20)}`, env.nom && `nom=${String(env.nom).slice(0, 30)}`,
+      action && `commande=${action}`, env.type === 'reponse' && `ok=${env.ok}`,
+      `champs lourds : ${lourds(env).slice(0, 6).join(', ') || 'aucun'}`].filter(Boolean).join(' · ');
+  }
+
+  _fermer(c, code, raison, detail = null) {
+    if (detail) console.error(`[hub] agent coupé : ${raison} (${detail})`);
     if (!c.authentifie) this._echec(c.ip, raison);
-    else this.journal('agent.coupure', { ip: c.ip, resultat: 'erreur', detail: raison });
+    else this.journal('agent.coupure', { ip: c.ip, resultat: 'erreur', detail: detail ? `${raison} : ${detail}`.slice(0, 500) : raison });
     clearTimeout(c.timerDefi);
     try { c.ws.close(code, raison.slice(0, 100)); } catch { /* déjà fermé */ }
     setTimeout(() => c.ws.terminate(), 2000).unref();
@@ -343,7 +364,7 @@ class Hub extends EventEmitter {
 
     let env, octets = null;
     if (!binaire) {
-      if (data.length > LIMITES.message_json_octets) return this._fermer(c, 1009, 'message trop gros');
+      if (data.length > LIMITES.message_json_octets) return this._fermer(c, 1009, 'message trop gros', this._decrireTropGros(data));
       try { env = JSON.parse(data.toString('utf8')); } catch { return this._fermer(c, 4002, 'JSON invalide'); }
     } else {
       if (data.length < 4) return this._fermer(c, 4002, 'trame binaire invalide');
@@ -537,7 +558,7 @@ class Hub extends EventEmitter {
         this.attente.delete(id);
         reject(new ErreurHub(504, 'delai_depasse', `pas de réponse de l'agent en ${delai / 1000} s`));
       }, delai);
-      this.attente.set(id, { resolve, reject, timer, sink: opts.sink, debut: opts.debut, delai });
+      this.attente.set(id, { resolve, reject, timer, sink: opts.sink, debut: opts.debut, delai, action });
       if (opts.envoi) {
         opts.envoi(c).catch((e) => {
           if (!this.attente.has(id)) return;

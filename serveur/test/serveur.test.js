@@ -435,6 +435,10 @@ test('message trop gros, champ inconnu, type inconnu : coupé', async () => {
     assert.ok([1009, 4002].includes(a.ferme.code), `code ${a.ferme.code}`);
     await attendre(() => srv.hub.lien === null);
   }
+  // message trop gros : le journal dit lequel (type, événement, champ lourd), sans son contenu
+  const coupure = srv.db.prepare("SELECT detail FROM audit WHERE action = 'agent.coupure' AND detail LIKE 'message trop gros%' ORDER BY id DESC LIMIT 1").get();
+  assert.match(coupure.detail, /octets · type=evenement · nom=etat · champs lourds : donnees\.x=70002/);
+  assert.doesNotMatch(coupure.detail, /aaaa/);
 });
 
 test('agent révoqué : refusé', async () => {
