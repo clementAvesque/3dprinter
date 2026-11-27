@@ -896,6 +896,11 @@ class Printer:
 
         # 1) imprimante d'abord (si elle a encore le fichier) : en cas d'échec, rien n'est déplacé
         if self._metadata(source) is not None:
+            # dossier de destination absent (ex. « imprimees/ » vidé puis supprimé) : Moonraker refuse le
+            # déplacement (400) -> créé d'abord ; une erreur ici (dossier déjà là) est sans importance
+            dossier = posixpath.dirname(destination)
+            if dossier:
+                req_send("POST", f"{self.base}/server/files/directory", json={"path": f"gcodes/{dossier}"}, timeout=10)
             res = req_send("POST", f"{self.base}/server/files/move",
                            json={"source": f"gcodes/{source}", "dest": f"gcodes/{destination}"}, timeout=20)
             if res.get("error"):
