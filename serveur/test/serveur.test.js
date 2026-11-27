@@ -387,6 +387,24 @@ test('aperçu 3D : description dans la réponse, ou jointe au transfert pour un 
   assert.equal(srv.hub.lien !== null, true, 'agent toujours connecté');
 });
 
+test("aperçu 3D d'une plaque : trajets du serveur, l'agent n'est pas sollicité", async () => {
+  const zlib = require('node:zlib');
+  const dossier = path.join(srv.config.donnees, 'gcode');
+  fs.mkdirSync(dossier, { recursive: true });
+  fs.writeFileSync(path.join(dossier, 'devis-777.trajets.json'), JSON.stringify({ version: 1, segments: 1, layers: [[0.2, 0, 1]] }));
+  fs.writeFileSync(path.join(dossier, 'devis-777.trajets.bin.gz'), zlib.gzipSync(Buffer.from('SEGPLAQUE')));
+  srv.db.prepare(`INSERT INTO lots (id, imprimante_id, proprete_mm, statut, gcode_chemin, fichier_machine, cree_le)
+    VALUES (777, 'kobra-1', 0.2, 'a_faire', 'gcode/devis-777.gcode.gz', 'a_faire/P0777_2026-11-28.gcode', ?)`).run(Date.now());
+  const n = agent.commandes.length;
+  const meta = await admin.req('GET', '/machines/kobra-1/files/a_faire/P0777_2026-11-28.gcode/toolpath');
+  assert.equal(meta.statut, 200, JSON.stringify(meta.json));
+  assert.deepEqual(meta.json.layers, [[0.2, 0, 1]]);
+  const bin = await admin.req('GET', '/machines/kobra-1/files/a_faire/P0777_2026-11-28.gcode/toolpath-bin');
+  assert.equal(Buffer.from(await bin.res.arrayBuffer()).toString(), 'SEGPLAQUE', 'décompressé par le client HTTP');
+  assert.equal(agent.commandes.length, n, "rien demandé à l'agent");
+  srv.db.prepare('DELETE FROM lots WHERE id = 777').run();
+});
+
 test('vidéo enregistrée téléchargée en flux (2,5 Mo)', async () => {
   const r = await admin.req('GET', '/machines/kobra-1/recordings/impression_20261117_120000.mp4');
   assert.equal(r.statut, 200);

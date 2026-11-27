@@ -331,6 +331,18 @@ function creerApi({ config, db, hub, journal, courriel = creerCourriel(config), 
     return { bin, meta };
   }
 
+  // trajets 3D de la plaque qui porte ce fichier sur cette machine (« a_faire/P0013_... » ou, une fois rangée,
+  // « imprimees/... ») : ceux du devis découpé, gcode/devis-<id>.trajets.json + .trajets.bin.gz ; null sinon
+  function trajetsPlaque(machine, nom) {
+    const l = db.prepare(`SELECT gcode_chemin FROM lots WHERE imprimante_id = ? AND (fichier_machine = ? OR rangement = ?)
+      AND statut != 'annulee' AND gcode_chemin IS NOT NULL ORDER BY id DESC LIMIT 1`).get(machine, nom, nom);
+    const base = l && /^(gcode\/devis-\d+)\.gcode\.gz$/.exec(l.gcode_chemin)?.[1];
+    if (!base) return null;
+    const meta = path.join(config.donnees, `${base}.trajets.json`);
+    const bin = path.join(config.donnees, `${base}.trajets.bin.gz`);
+    return fs.existsSync(meta) && fs.existsSync(bin) ? { meta, bin } : null;
+  }
+
   // /machines/:m/files/<nom avec sous-dossiers>[/thumbnail | /toolpath | /toolpath-bin]
   api.get('/machines/:m/files/*', exige('lecteur'), machineConnue, asynchrone(async (req, res) => {
     const m = hub.machine(req.params.m);
@@ -346,6 +358,15 @@ function creerApi({ config, db, hub, journal, courriel = creerCourriel(config), 
         // peut désigner un autre gcode (fichier remplacé) : une copie gardée 1 h sans vérifier était fausse.
         res.set({ 'Content-Type': fs.readFileSync(`${o.bin}.mime`, 'utf8'), 'Cache-Control': 'private, no-cache' });
         return res.sendFile(o.bin);
+      }
+      // plaque de la boutique : trajets déjà calculés par le serveur à la découpe (même format que l'agent).
+      // Servis directement : instantané, et la Raspberry n'a pas à relire un gcode de 50 Mo.
+      const plaque = trajetsPlaque(m.id, nom);
+      if (plaque) {
+        res.set('Cache-Control', 'private, no-cache');
+        if (quoi === 'toolpath') return res.type('application/json').sendFile(plaque.meta);
+        res.set({ 'Content-Type': 'application/octet-stream', 'Content-Encoding': 'gzip' });
+        return res.sendFile(plaque.bin);
       }
       const o = await obtenir(req, m, nom, 'file.toolpath', '.bin', '.json');
       if (o.r) return repondre(res, o.r);
