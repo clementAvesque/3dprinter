@@ -18,10 +18,6 @@ const { pipeline } = require('node:stream/promises');
 const { lireGcode } = require('./trajets');
 const { echelonnerStl } = require('./stl');
 
-// réglage « propreté » du devis -> hauteur de couche et lissage envoyés à Orca.
-// « rapide » est stocké 0.4 (valeur d'origine de la conception) mais la Kobra 3 0.4 mm accepte 0.28 mm au plus.
-const COUCHES = { 0.2: { layer_height: '0.2', ironing_type: 'top' }, 0.4: { layer_height: '0.28', ironing_type: 'no ironing' } };
-
 const fichiersDevis = (dossier, id) => ({
   gcode: path.join(dossier, `devis-${id}.gcode.gz`),
   meta: path.join(dossier, `devis-${id}.trajets.json`),
@@ -134,14 +130,12 @@ function creerDecoupeur({ config, db, calculerPrix, quandEchec }) {
         for (let k = 0; k < p.quantite; k++) stls.push(f);
       }
 
-      // profils du devis : seuls ces réglages, bornés à la création du devis, changent
+      // profils du devis : seul le remplissage, borné à la création du devis, change. Hauteur de couche, parois et
+      // faces viennent du profil (ISO 2768-m, scripts/orca_profils.py) ; couches_surface et proprete_mm des
+      // anciens devis sont ignorés, une réimpression suit donc le profil actuel.
       const lire = (nom) => JSON.parse(fs.readFileSync(path.join(profils, `${nom}.json`), 'utf8'));
       const machine = { ...lire('machine'), thumbnails: '' };         // pas de vignette : pas besoin d'OpenGL
-      const couche = COUCHES[devis.proprete_mm] || COUCHES[0.2];
-      const process_ = { ...lire('process'), ...couche,
-        sparse_infill_density: `${devis.remplissage_pct}%`,
-        top_shell_layers: String(devis.couches_surface), bottom_shell_layers: String(devis.couches_surface),
-        top_shell_thickness: '0', bottom_shell_thickness: '0' };
+      const process_ = { ...lire('process'), sparse_infill_density: `${devis.remplissage_pct}%` };
       const ecrire = (nom, d) => { const f = path.join(dossier, `${nom}.json`); fs.writeFileSync(f, JSON.stringify(d)); return f; };
       const fm = ecrire('machine', machine), fp = ecrire('process', process_), ff = ecrire('filament', lire('filament'));
 
@@ -236,4 +230,4 @@ function creerDecoupeur({ config, db, calculerPrix, quandEchec }) {
   };
 }
 
-module.exports = { creerDecoupeur, COUCHES };
+module.exports = { creerDecoupeur };

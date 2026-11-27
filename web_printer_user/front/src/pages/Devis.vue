@@ -17,7 +17,6 @@ const STATUTS = {
   pret: ['Devis prêt', ''],
   erreur: ['Découpe impossible', ''],
 };
-const PROPRETES = { fine: 'Fine · 0,2 mm + lissage', rapide: 'Rapide · 0,28 mm' };
 const euros = (cts) => (cts == null ? '—' : `${(cts / 100).toFixed(2).replace('.', ',')} €`);
 const mm = (v) => `${Math.round(v * 10) / 10}`.replace('.', ',');
 const statut = computed(() => STATUTS[devis.value?.statut] || ['', '']);
@@ -128,8 +127,7 @@ async function supprimer() {
             <b>× {{ p.quantite }}</b>
           </li>
         </ul>
-        <p class="discret">Remplissage {{ devis.reglages.remplissage_pct }} % · {{ devis.reglages.couches_surface }} couches de surface ·
-          {{ PROPRETES[devis.reglages.proprete] }}</p>
+        <p class="discret">Remplissage {{ devis.reglages.remplissage_pct }} %</p>
       </div>
 
       <div v-if="devis.statut === 'pret'" class="carte">

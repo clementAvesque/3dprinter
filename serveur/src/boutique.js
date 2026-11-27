@@ -25,7 +25,10 @@ const gzip = promisify(zlib.gzip);
 const JOUR = 864e5;
 const STATUTS_EN_COURS = ['payee', 'validee', 'dans_un_lot', 'en_impression', 'suspendue', 'imprimee'];
 const STATUTS_ENVOI = ['validee', 'dans_un_lot', 'en_impression', 'suspendue', 'imprimee'];
-const PROPRETES = { fine: 0.2, rapide: 0.4 };
+// le client ne choisit que le remplissage : le reste vient du profil Orca (ISO 2768-m, scripts/orca_profils.py).
+// Colonnes couches_surface et proprete_mm gardées pour les anciens devis ; les nouveaux y notent le profil
+// (5 couches dessus, 0,2 mm), à titre d'information seulement (src/orca.js ne les lit plus).
+const PROFIL_FIXE = { couches_surface: 5, proprete_mm: 0.2 };
 const DEVIS_EN_ATTENTE_MAX = 3;     // par client : la découpe est lente, un client ne doit pas bloquer la file
 
 // ---------------------------------------------------------------- règles (exportées pour les tests)
@@ -134,8 +137,7 @@ function creerBoutique({ config, db, hub, journal, courriel, paiements, clients,
     const c = q.commandeDuDevis.get(d.id);
     return {
       id: admin ? d.id : d.uuid, uuid: d.uuid, ref: ref(d.uuid), imprimante_id: d.imprimante_id, statut: d.statut, erreur: d.erreur,
-      reglages: { remplissage_pct: d.remplissage_pct, couches_surface: d.couches_surface,
-        proprete: d.proprete_mm === 0.2 ? 'fine' : 'rapide' },
+      reglages: { remplissage_pct: d.remplissage_pct },
       poids_g: d.poids_g, duree_s: d.duree_s, nb_couches: d.nb_couches,
       prix_matiere_cts: d.prix_matiere_cts, livraison_cts: d.livraison_cts,
       total_cts: d.prix_matiere_cts == null ? null : d.prix_matiere_cts + d.livraison_cts,
@@ -276,7 +278,7 @@ function creerBoutique({ config, db, hub, journal, courriel, paiements, clients,
   rc.get('/tarifs', (req, res) => {
     res.json({ prix_gramme_cts: B.prixGrammeCts, emballage_g: B.emballageG, livraison: B.livraison,
       livraison_par_kg_en_plus_cts: B.livraisonParKgEnPlusCts, objectif_envoi_jours: B.objectifEnvoiJours,
-      envoi_max_jours: B.envoiJours, reglages: { remplissage_pct: [5, 100], couches_surface: [2, 10], proprete: Object.keys(PROPRETES) } });
+      envoi_max_jours: B.envoiJours, reglages: { remplissage_pct: [5, 100] } });
   });
 
   // ------------------------------------------------ fichiers STL
@@ -354,13 +356,13 @@ function creerBoutique({ config, db, hub, journal, courriel, paiements, clients,
   const reel = (v, min, max) => v === null || v === undefined || (typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max);
 
   // nouveau devis en file pour la découpe. lignes : [fichier_id, quantite, pos_x, pos_y, rotation, echelle]
-  function creerDevis(clientId, imp, { remp, couches, proprete_mm: propreteMm }, lignes, publicationId = null) {
+  function creerDevis(clientId, imp, remp, lignes, publicationId = null) {
     const now = Date.now();
     db.exec('BEGIN');
     try {
       const { lastInsertRowid: id } = db.prepare(`INSERT INTO devis (client_id, imprimante_id, remplissage_pct, couches_surface,
         proprete_mm, statut, cree_le, publication_id) VALUES (?, ?, ?, ?, ?, 'attente', ?, ?)`)
-        .run(clientId, imp.id, remp, couches, propreteMm, now, publicationId);
+        .run(clientId, imp.id, remp, PROFIL_FIXE.couches_surface, PROFIL_FIXE.proprete_mm, now, publicationId);
       const ins = db.prepare(`INSERT INTO devis_pieces (devis_id, fichier_id, quantite, pos_x_mm, pos_y_mm, rotation_deg, echelle)
         VALUES (?, ?, ?, ?, ?, ?, ?)`);
       for (const l of lignes) ins.run(id, ...l);
@@ -382,9 +384,10 @@ function creerBoutique({ config, db, hub, journal, courriel, paiements, clients,
     if (Object.keys(reste).length) return res.status(400).json({ erreur: 'champ_inconnu' });
     const imp = typeof impId === 'string' ? q.imprimante.get(impId) : null;
     if (!imp || !imp.disponible) return res.status(400).json({ erreur: 'imprimante_indisponible' });
-    const { remplissage_pct: remp, couches_surface: couches, proprete, ...autres } = reglages || {};
-    if (Object.keys(autres).length || !entier(remp, 5, 100) || !entier(couches, 2, 10) || !(proprete in PROPRETES)) {
-      return res.status(400).json({ erreur: 'reglages_invalides', detail: 'remplissage 5-100, couches de surface 2-10, propreté fine ou rapide' });
+    // couches_surface et proprete : envoyés par les pages d'avant le profil ISO 2768-m (encore en cache), ignorés
+    const { remplissage_pct: remp, couches_surface: _couches, proprete: _proprete, ...autres } = reglages || {};
+    if (Object.keys(autres).length || !entier(remp, 5, 100)) {
+      return res.status(400).json({ erreur: 'reglages_invalides', detail: 'remplissage de 5 à 100 %' });
     }
     if (!Array.isArray(pieces) || !pieces.length || pieces.length > 50) return res.status(400).json({ erreur: 'pieces_invalides', detail: '1 à 50 pièces' });
     if (devisEnCours(req.client.id) >= DEVIS_EN_ATTENTE_MAX) {
@@ -423,7 +426,7 @@ function creerBoutique({ config, db, hub, journal, courriel, paiements, clients,
     }
     // devis avec des pièces d'un projet : relié au (premier) projet, ce qui empêche aussi de le republier comme le sien
     const [premier] = projets.values();
-    const id = creerDevis(req.client.id, imp, { remp, couches, proprete_mm: PROPRETES[proprete] }, lignes, premier?.id ?? null);
+    const id = creerDevis(req.client.id, imp, remp, lignes, premier?.id ?? null);
     for (const pu of projets.values()) db.prepare('UPDATE publications SET choisie = choisie + 1 WHERE id = ?').run(pu.id);
     journal('client.devis', { req, cible: `${req.client.email} devis ${id}`, resultat: 'ok',
       detail: `${lignes.length} pièce(s)${projets.size ? `, projet(s) ${[...projets.values()].map((pu) => pu.uuid).join(' ')}` : ''}` });
@@ -678,7 +681,7 @@ function creerBoutique({ config, db, hub, journal, courriel, paiements, clients,
     const pieces = piecesDuProjet(d.id);
     return { id: pu.uuid, titre: pu.titre, auteur: pu.pseudo, cree_le: pu.cree_le, choisie: pu.choisie,
       imprimante_id: d.imprimante_id, poids_g: d.poids_g, duree_s: d.duree_s, prix_matiere_cts: d.prix_matiere_cts,
-      reglages: { remplissage_pct: d.remplissage_pct, couches_surface: d.couches_surface, proprete: d.proprete_mm === 0.2 ? 'fine' : 'rapide' },
+      reglages: { remplissage_pct: d.remplissage_pct },
       disponible: pieces.every((p) => p.chemin),
       ajustable: !!pu.partage_stl,          // peut s'ouvrir dans l'atelier (STL partagés)
       pieces: pieces.map((p, i) => ({ n: i + 1, nom: p.nom_origine.replace(/\.stl$/i, ''), quantite: p.quantite, echelle: p.echelle,
@@ -733,7 +736,7 @@ function creerBoutique({ config, db, hub, journal, courriel, paiements, clients,
     if (devisEnCours(req.client.id) >= DEVIS_EN_ATTENTE_MAX) {
       return res.status(429).json({ erreur: 'trop_de_devis', detail: `${DEVIS_EN_ATTENTE_MAX} devis en cours de découpe au plus : attends qu'ils soient prêts` });
     }
-    const id = creerDevis(req.client.id, imp, { remp: source.remplissage_pct, couches: source.couches_surface, proprete_mm: source.proprete_mm },
+    const id = creerDevis(req.client.id, imp, source.remplissage_pct,
       pieces.map((p) => [p.fichier_id, p.quantite, p.pos_x_mm, p.pos_y_mm, p.rotation_deg, p.echelle]), pu.id);
     db.prepare('UPDATE publications SET choisie = choisie + 1 WHERE id = ?').run(pu.id);
     journal('client.galerie.choix', { req, cible: `${req.client.email} devis ${id}`, resultat: 'ok', detail: `projet ${pu.uuid}` });

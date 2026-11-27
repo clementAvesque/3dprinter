@@ -102,7 +102,7 @@ async function devisPret(c) {
   const fd = new FormData();
   fd.append('fichier', new Blob([cube()]), 'cube.stl');
   const f = await c.req('POST', '/fichiers', fd);
-  const d = await c.req('POST', '/devis', { imprimante_id: 'kobra-1', reglages: { remplissage_pct: 15, couches_surface: 3, proprete: 'fine' },
+  const d = await c.req('POST', '/devis', { imprimante_id: 'kobra-1', reglages: { remplissage_pct: 15 },
     pieces: [{ fichier_id: f.json.id, quantite: 1 }] });
   for (let i = 0; i < 200; i++) {
     if ((await c.req('GET', `/devis/${d.json.id}`)).json.statut === 'pret') break;

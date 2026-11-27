@@ -24,7 +24,7 @@ PROFILS = {
     "kobra3": {
         "machine": "Anycubic Kobra 3 0.4 nozzle",
         "process": "0.20mm Standard @Anycubic Kobra 3 0.4 nozzle",
-        "filament": "Anycubic PLA @Anycubic Kobra 3 0.4 nozzle",
+        "filament": "Anycubic PLA High Speed @Anycubic Kobra 3 0.4 nozzle",
     },
 }
 
@@ -39,13 +39,16 @@ CORRECTIONS = {
 }
 
 # réglages propres à chaque imprimante, par-dessus ceux d'Anycubic.
-# Supports arbre (organiques) automatiques : le profil Anycubic les prépare mais les laisse désactivés,
-# et les pièces des clients ne sont pas toutes imprimables sans. Angle choisi pour la Kobra 3 (buse 0,4,
-# PLA, bonne ventilation) : elle tient proprement les surplombs jusqu'à ~60° de la verticale ; au-delà
-# (surface à moins de 30° de l'horizontale, valeur par défaut d'Orca), un support arbre est ajouté. 40° mettait
-# des arbres sous des surplombs qui s'impriment très bien sans (+16 % de plastique sur un plateau de roues F1).
-# Supports aussi posés sur la pièce
-# (pas seulement sur le plateau) : sinon les surplombs au-dessus de la pièce elle-même tombent dans le vide.
+# Profil « FERME – ISO 2768-m » (27/11) : vise les tolérances générales ISO 2768-m (±0,1 mm jusqu'à 6 mm,
+# ±0,2 de 6 à 30, ±0,3 de 30 à 120) à vitesse sûre, environ 2 fois plus long que le profil Benchy d'avant.
+# Le client ne règle plus que le remplissage (src/orca.js) : hauteur de couche, parois et faces sont fixées ici.
+# Écarts volontaires au profil d'origine :
+#  - supports arbre automatiques gardés (le profil les coupe) : les pièces des clients ne sont pas toutes
+#    imprimables sans. Angle 30° : la Kobra 3 tient proprement les surplombs jusqu'à ~60° de la verticale.
+#    Supports aussi posés sur la pièce, sinon les surplombs au-dessus d'elle tombent dans le vide.
+#  - « seam_slope_type: contour » n'existe pas dans Orca 2.5 (none / external / all) : « external », la couture
+#    en biseau sur la paroi extérieure seulement, ce que « contour » désigne.
+#  - plateau PEI texturé : sans « curr_bed_type », Orca en ligne de commande chauffe un « Cool Plate » à 35 °C.
 REGLAGES = {
     "kobra3": {
         "process": {
@@ -55,86 +58,141 @@ REGLAGES = {
             "support_threshold_angle": "30",
             "support_on_build_plate_only": "0",
             "tree_support_auto_brim": "1",
-            # plateau monté sur la Kobra 3 : PEI texturé (PLA à 60 °C dans le profil filament). Sans ce réglage,
-            # Orca en ligne de commande prend le « Cool Plate » par défaut : plateau à 35 °C, mauvaise adhérence.
             "curr_bed_type": "Textured PEI Plate",
-            # ---- pratiques du « HS PLA Speed Benchy » d'Anycubic pour la Kobra 3 (PrusaSlicer 2.7.1, impressions
-            # quasi parfaites en PLA Haute Vitesse), vitesses réduites de 36 %. Supports arbre gardés (ci-dessus).
-            # vitesses (Benchy x 0,64 : -20 % du Benchy, puis -20 % de plus le 25/11 contre sous-extrusion,
-            # fils d'ange et decalages de couche) : paroi externe 380 -> 243, parois internes et remplissage
-            # 600 -> 384, remplissage plein 360 -> 230, dessus et petits trous 300 -> 192,
-            # 1re couche 200 -> 128, deplacements 600 -> 384 mm/s
-            "outer_wall_speed": "243",
-            "inner_wall_speed": "384",
-            "sparse_infill_speed": "384",
-            "internal_solid_infill_speed": "230",
-            "top_surface_speed": "192",
-            "gap_infill_speed": "192",
-            "initial_layer_speed": "128",
-            "initial_layer_infill_speed": "128",
-            "bridge_speed": "128",
-            "support_speed": "96",
-            "skirt_speed": "128",
-            "travel_speed": "384",
-            "small_perimeter_speed": "95%",          # 360 / 380 dans le Benchy
-            "internal_bridge_speed": "100%",
-            "support_interface_speed": "100%",
-            "enable_overhang_speed": "1",            # surplombs ralentis (dynamic overhang speeds du Benchy)
-            "slow_down_layers": "0",
-            # accélérations du Benchy : 3000 partout, 1000 pour la 1re couche
-            **{k: "3000" for k in ("default_acceleration", "outer_wall_acceleration", "inner_wall_acceleration",
-                                    "sparse_infill_acceleration", "internal_solid_infill_acceleration",
-                                    "top_surface_acceleration", "bridge_acceleration", "travel_acceleration")},
-            "initial_layer_acceleration": "1000",
-            # parois externes d'abord (meilleur aspect), 2 parois, remplissage en lignes.
-            # ESSAI du 25/11 (trous aux angles) : couture au hasard au lieu d'alignée pour voir si les trous
-            # se répartissent, et plus d'espace à la fermeture du tour (seam_gap 10 % -> 0). À remettre à
-            # "aligned" / "10%" si la couture n'est pas la cause : au hasard, c'est plus laid.
-            "wall_sequence": "outer wall/inner wall",
-            "seam_position": "random",
-            "seam_gap": "0%",
-            "seam_slope_type": "none",   # scarf seam laissée désactivée pour isoler le problème
-            "wall_loops": "2",
-            "sparse_infill_pattern": "zig-zag",
-            "infill_wall_overlap": "15%",
-            # largeurs de ligne : 0,42 paroi externe, 0,45 le reste, 0,5 première couche (0,23 mm d'épaisseur)
+            # couches : 0,2 mm partout, 1re couche comprise ; Z précis (dernière couche ajustée à la hauteur exacte)
+            "layer_height": "0.20",
+            "initial_layer_print_height": "0.20",
+            "precise_z_height": "1",
+            "ironing_type": "no ironing",
+            # largeurs de ligne
+            "line_width": "0.42",
             "outer_wall_line_width": "0.42",
             "inner_wall_line_width": "0.45",
-            "sparse_infill_line_width": "0.45",
-            "internal_solid_infill_line_width": "0.45",
-            "top_surface_line_width": "0.45",
             "initial_layer_line_width": "0.5",
-            "initial_layer_print_height": "0.23",
+            "sparse_infill_line_width": "0.50",
+            "internal_solid_infill_line_width": "0.42",
+            "top_surface_line_width": "0.40",
+            "support_line_width": "0.42",
+            # parois : 3 tours, ordre intérieur-extérieur-intérieur (paroi externe tenue des deux côtés : cotes
+            # plus justes sans bourrelet), paroi externe précise
+            "wall_generator": "arachne",
+            "wall_loops": "3",
+            "wall_sequence": "inner-outer-inner wall",
+            "precise_outer_wall": "1",
+            "only_one_wall_top": "1",
+            "detect_overhang_wall": "1",
+            "ensure_vertical_shell_thickness": "ensure_all",
+            # faces : 5 couches dessus (1 mm), 4 dessous
+            "top_shell_layers": "5",
+            "top_shell_thickness": "1.0",
+            "bottom_shell_layers": "4",
+            "bottom_shell_thickness": "0",
+            "top_surface_pattern": "monotonicline",
+            "bottom_surface_pattern": "monotonic",
+            "internal_solid_infill_pattern": "monotonic",
+            # remplissage : gyroïde ; la densité vient du devis (choix du client), 15 % par défaut
+            "sparse_infill_pattern": "gyroid",
+            "sparse_infill_density": "15%",
+            "infill_wall_overlap": "15%",
+            "reduce_crossing_wall": "1",
+            # couture alignée, 10 % d'espace à la fermeture, coutures internes décalées, biseau (scarf) extérieur
+            "seam_position": "aligned",
+            "seam_gap": "10%",
+            "staggered_inner_seams": "1",
+            "wipe_on_loops": "1",
+            "seam_slope_type": "external",
+            # compensations : seulement la patte d'éléphant (1re couche écrasée) ; résolution fine, pas d'arcs
+            "xy_hole_compensation": "0",
+            "xy_contour_compensation": "0",
+            "elefant_foot_compensation": "0.15",
+            "resolution": "0.008",
+            "enable_arc_fitting": "0",
+            # vitesses (mm/s)
+            "initial_layer_speed": "50",
+            "initial_layer_infill_speed": "100",
+            "outer_wall_speed": "120",
+            "inner_wall_speed": "260",
+            "small_perimeter_speed": "50%",
+            "small_perimeter_threshold": "6.5",
+            "sparse_infill_speed": "280",
+            "internal_solid_infill_speed": "260",
+            "top_surface_speed": "150",
+            "gap_infill_speed": "150",
+            "bridge_speed": "45",
+            "internal_bridge_speed": "90",
+            "support_speed": "150",
+            "support_interface_speed": "80",
+            "skirt_speed": "50",
+            "enable_overhang_speed": "1",
+            "overhang_1_4_speed": "80",
+            "overhang_2_4_speed": "50",
+            "overhang_3_4_speed": "25",
+            "overhang_4_4_speed": "10",
+            "travel_speed": "500",
+            "slow_down_layers": "2",
+            # accélérations (mm/s²)
+            "default_acceleration": "7500",
+            "outer_wall_acceleration": "3100",
+            "inner_wall_acceleration": "7000",
+            "sparse_infill_acceleration": "9000",
+            "internal_solid_infill_acceleration": "8000",
+            "top_surface_acceleration": "3500",
+            "bridge_acceleration": "2500",
+            "initial_layer_acceleration": "1200",
+            "travel_acceleration": "9000",
+            "accel_to_decel_enable": "1",
+            "accel_to_decel_factor": "50%",
+            "default_jerk": "0",
+            "brim_type": "auto_brim",
+            "enable_prime_tower": "0",
+            "max_travel_detour_distance": "0",
+            "exclude_object": "1",
         },
-        # PLA Haute Vitesse du Benchy : 225 °C (1re couche comprise), débit max 35 mm³/s -> 22 (-37 %,
-        # abaisse avec les vitesses le 25/11 : a 225 °C la buse ne fait plus fondre 28 mm³/s),
-        # débit x1,02, ventilateur coupé sur les 2 premières couches puis 100 % dès la 3e.
-        # Gardé malgré le Benchy (qui l'a désactivé) : petites couches ralenties pour refroidir (choix du 22/11).
+        # PLA Haute Vitesse : 215 °C la 1re couche puis 210, débit x0,98, 19 mm³/s au plus, avance de pression 0,03.
+        # Ventilateur coupé sur la 1re couche, 85-100 % dès la 3e. Rétraction (prioritaire sur celle de la
+        # machine) : 0,8 mm à 40 mm/s, levée en spirale de 0,2 mm, essuyage de 1,5 mm, à chaque changement de couche.
         "filament": {
-            "nozzle_temperature": ["225"],
-            "nozzle_temperature_initial_layer": ["225"],
-            "nozzle_temperature_range_high": ["250"],
-            "filament_max_volumetric_speed": ["22"],
-            "filament_flow_ratio": ["1.02"],
-            "close_fan_the_first_x_layers": ["2"],
-            "full_fan_speed_layer": ["3"],
-            "fan_min_speed": ["100"],
+            "filament_type": ["PLA"],
+            "filament_diameter": ["1.75"],
+            "filament_density": ["1.24"],
+            "filament_flow_ratio": ["0.98"],
+            "filament_max_volumetric_speed": ["19"],
+            "filament_shrink": ["100%"],
+            "temperature_vitrification": ["55"],
+            "nozzle_temperature": ["210"],
+            "nozzle_temperature_initial_layer": ["215"],
+            "nozzle_temperature_range_low": ["190"],
+            "nozzle_temperature_range_high": ["240"],
+            "hot_plate_temp": ["60"],
+            "hot_plate_temp_initial_layer": ["60"],
+            "textured_plate_temp": ["60"],
+            "textured_plate_temp_initial_layer": ["60"],
+            "enable_pressure_advance": ["1"],
+            "pressure_advance": ["0.030"],
+            "fan_min_speed": ["85"],
             "fan_max_speed": ["100"],
+            "fan_cooling_layer_time": ["30"],
+            "close_fan_the_first_x_layers": ["1"],
+            "full_fan_speed_layer": ["3"],
+            "overhang_fan_speed": ["100"],
+            "overhang_fan_threshold": ["25%"],
+            "reduce_fan_stop_start_freq": ["1"],
+            "slow_down_for_layer_cooling": ["1"],
+            "slow_down_layer_time": ["5"],
+            "slow_down_min_speed": ["20"],
+            "filament_retraction_length": ["0.8"],
+            "filament_retraction_speed": ["40"],
+            "filament_deretraction_speed": ["30"],
+            "filament_retract_before_wipe": ["70%"],
+            "filament_wipe": ["1"],
+            "filament_z_hop": ["0.2"],
+            "filament_z_hop_types": ["Spiral Lift"],
+            "filament_retract_when_changing_layer": ["1"],
+            "filament_retraction_minimum_travel": ["1"],
+            "filament_wipe_distance": ["1.5"],
         },
-        # rétraction du Benchy : 0,4 mm à 160 mm/s, sans levée de buse ni essuyage, pas de rétraction au
-        # changement de couche, seulement pour les déplacements de plus de 2 mm.
-        # Longueur gardée à 0,4 (déjà très court en direct drive) ; 0,05 mm redonné à la reprise le 25/11
-        # pour combler les trous aux angles sans toucher à la rétraction.
-        "machine": {
-            "retraction_length": ["0.4"],
-            "retract_restart_extra": ["0.05"],
-            "retraction_speed": ["160"],
-            "deretraction_speed": ["160"],
-            "z_hop": ["0"],
-            "wipe": ["0"],
-            "retract_when_changing_layer": ["0"],
-            "retraction_minimum_travel": ["2"],
-        },
+        # machine : celle d'Anycubic, sans retouche (la rétraction est réglée dans le filament ci-dessus)
+        "machine": {},
     },
 }
 

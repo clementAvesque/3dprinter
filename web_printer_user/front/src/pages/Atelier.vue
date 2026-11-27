@@ -59,7 +59,6 @@ onBeforeUnmount(() => {
 });
 
 const plateau = computed(() => atelier.imprimante?.plateau_mm || atelier.imprimantes[0]?.plateau_mm || [250, 250, 260]);
-const PROPRETES = { fine: 'Fine · 0,2 mm + lissage', rapide: 'Rapide · 0,28 mm' };
 const mm = (v) => `${Math.round(v * 10) / 10}`.replace('.', ',');
 const peutDecouper = computed(() => atelier.pieces.length > 0 && !!atelier.imprimante && !atelier.trop_grandes.length
   && !atelier.trop_petites.length && !envoi.value);
@@ -218,8 +217,8 @@ function apresConnexion() {
         <div class="carte reglages">
           <div>
             <h2>Réglages</h2>
-            <p>Remplissage {{ atelier.reglages.remplissage_pct }} % · {{ atelier.reglages.couches_surface }} couches de surface</p>
-            <p>Propreté : {{ PROPRETES[atelier.reglages.proprete] }}</p>
+            <p>Remplissage {{ atelier.reglages.remplissage_pct }} %</p>
+            <p>Profil de précision ISO 2768-m · couches de 0,2 mm</p>
           </div>
           <button class="secondaire" @click="reglagesOuverts = true">Modifier</button>
         </div>

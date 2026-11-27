@@ -17,7 +17,7 @@ export const useAtelier = defineStore('atelier', {
     //   sur le serveur, le devis la désigne par projet + numéro)
     pieces: [],
     selection: null,       // id de la pièce sélectionnée (clic dans la liste ou sur le plateau 3D)
-    reglages: { remplissage_pct: 15, couches_surface: 3, proprete: 'fine' },
+    reglages: { remplissage_pct: 15 },          // seul réglage du client : le reste vient du profil du serveur
     imprimantes: [],
     erreurs: [],
   }),
@@ -76,7 +76,7 @@ export const useAtelier = defineStore('atelier', {
         throw e;
       }
       this.pieces.push(...lues);
-      if (vide) this.reglages = { ...projet.reglages };
+      if (vide) this.reglages = { remplissage_pct: projet.reglages.remplissage_pct };
       this.selection = lues[0]?.id ?? null;
     },
     changerEchelle(id, valeur) {

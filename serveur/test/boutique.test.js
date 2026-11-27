@@ -287,13 +287,21 @@ test('STL : envoi, lecture par son propriétaire seulement, refus du reste', asy
 });
 
 test('devis : réglages bornés, pièce trop grande refusée, fichier d\'un autre refusé', async () => {
-  const reglages = { remplissage_pct: 15, couches_surface: 3, proprete: 'fine' };
+  const reglages = { remplissage_pct: 15 };
   const ok = await alice.req('POST', '/devis', { imprimante_id: 'kobra-1', reglages, pieces: [{ fichier_id: fichierId, quantite: 2, pos_mm: [10, 10] }] });
   assert.equal(ok.statut, 201, JSON.stringify(ok.json));
   assert.equal(ok.json.statut, 'attente');
-  assert.equal(ok.json.reglages.proprete, 'fine');
+  assert.deepEqual(ok.json.reglages, { remplissage_pct: 15 }, 'seul le remplissage se règle');
   assert.equal(ok.json.pieces[0].quantite, 2);
-  for (const r of [{ ...reglages, remplissage_pct: 3 }, { ...reglages, couches_surface: 11 }, { ...reglages, proprete: 'ultra' }, { ...reglages, autre: 1 }]) {
+  // page d'avant le profil ISO 2768-m (encore en cache) : couches de surface et propreté acceptées mais ignorées
+  const ancien = await alice.req('POST', '/devis', { imprimante_id: 'kobra-1', reglages: { remplissage_pct: 20, couches_surface: 2, proprete: 'rapide' },
+    pieces: [{ fichier_id: fichierId, quantite: 1 }] });
+  assert.equal(ancien.statut, 201, JSON.stringify(ancien.json));
+  assert.deepEqual({ ...srv.db.prepare('SELECT remplissage_pct, couches_surface, proprete_mm FROM devis WHERE uuid = ?').get(ancien.json.id) },
+    { remplissage_pct: 20, couches_surface: 5, proprete_mm: 0.2 }, 'profil fixe noté en base');
+  srv.db.prepare('DELETE FROM devis_pieces WHERE devis_id = (SELECT id FROM devis WHERE uuid = ?)').run(ancien.json.id);
+  srv.db.prepare('DELETE FROM devis WHERE uuid = ?').run(ancien.json.id);
+  for (const r of [{ ...reglages, remplissage_pct: 3 }, { ...reglages, remplissage_pct: 101 }, { ...reglages, remplissage_pct: 15.5 }, { ...reglages, autre: 1 }]) {
     assert.equal((await alice.req('POST', '/devis', { imprimante_id: 'kobra-1', reglages: r, pieces: [{ fichier_id: fichierId, quantite: 1 }] })).statut, 400);
   }
   const gros = await alice.req('POST', '/fichiers', envoiStl('gros.stl', cube(300)));
@@ -310,7 +318,7 @@ test('découpe : le serveur découpe le devis -> poids, prix, aperçu réservé 
   assert.equal(cx.statut, 200, JSON.stringify(cx.json));
   carol.csrf = cx.json.csrf;
   const f = await carol.req('POST', '/fichiers', envoiStl('cube.stl', cube(20)));
-  const reglages = { remplissage_pct: 15, couches_surface: 3, proprete: 'fine' };
+  const reglages = { remplissage_pct: 15 };
   const creer = (r, quantite = 2) => carol.req('POST', '/devis', { imprimante_id: 'kobra-1', reglages: { ...reglages, ...r },
     pieces: [{ fichier_id: f.json.id, quantite }] });
 
@@ -326,7 +334,8 @@ test('découpe : le serveur découpe le devis -> poids, prix, aperçu réservé 
   assert.equal(d.nb_couches, 3);
   const g = gcodeDuDevis(d.id);
   assert.match(g, /; pieces = 2/, 'une copie du STL par exemplaire');
-  assert.match(g, /; layer_height = 0\.2\n; ironing_type = top\n; sparse_infill_density = 15%\n; top_shell_layers = 3/);
+  // profil ISO 2768-m tel quel (serveur/orca/kobra3/process.json), seul le remplissage vient du devis
+  assert.match(g, /; layer_height = 0\.20\n; ironing_type = no ironing\n; sparse_infill_density = 15%\n; top_shell_layers = 5/);
 
   // aperçu : réservé au propriétaire, jamais le gcode lui-même
   const meta = await carol.req('GET', `/devis/${d.id}/trajets`);
@@ -349,9 +358,11 @@ test('découpe : le serveur découpe le devis -> poids, prix, aperçu réservé 
   assert.equal(d.ref, d.id.slice(0, 8).toUpperCase(), 'référence courte affichée au client');
   assert.equal((await carol.req('GET', `/devis/${interne('devis', d.id)}`)).statut, 404, 'le numéro interne ne marche pas côté client');
 
-  // « rapide » : 0,28 mm (la Kobra 3 0.4 n'accepte pas 0,4 mm), sans lissage
-  const rapide = await devisDecoupe(carol, (await creer({ proprete: 'rapide' }, 1)).json.id);
-  assert.match(gcodeDuDevis(rapide.id), /; layer_height = 0\.28\n; ironing_type = no ironing/);
+  // ancien devis « rapide » (0,4) : découpé lui aussi avec le profil actuel (couches de 0,2 mm)
+  const ancien = await creer({ remplissage_pct: 30 }, 1);
+  srv.db.prepare('UPDATE devis SET proprete_mm = 0.4, couches_surface = 2 WHERE uuid = ?').run(ancien.json.id);
+  assert.match(gcodeDuDevis((await devisDecoupe(carol, ancien.json.id)).id),
+    /; layer_height = 0\.20\n; ironing_type = no ironing\n; sparse_infill_density = 30%\n; top_shell_layers = 5/);
 
   // échecs : message clair au client, aucun détail interne
   const panne = await devisDecoupe(carol, (await creer({ remplissage_pct: 99 }, 1)).json.id);
@@ -395,7 +406,7 @@ test('multiplicateur de taille : STL en mètres (Blender) x1000 -> pièce à la 
   carol.csrf = (await carol.req('POST', '/connexion', { email: 'carol@test.local', motdepasse: 'un-mot-de-passe-solide' })).json.csrf;
   const f = await carol.req('POST', '/fichiers', envoiStl('blender.stl', cube(0.02)));     // 20 mm exportés en mètres
   assert.equal(f.statut, 201, 'un STL minuscule est accepté au dépôt');
-  const reglages = { remplissage_pct: 15, couches_surface: 3, proprete: 'fine' };
+  const reglages = { remplissage_pct: 15 };
   const creer = (echelle) => carol.req('POST', '/devis', { imprimante_id: 'kobra-1', reglages,
     pieces: [{ fichier_id: f.json.id, quantite: 1, ...(echelle === undefined ? {} : { echelle }) }] });
 
@@ -421,7 +432,7 @@ test('multiplicateur de taille : STL en mètres (Blender) x1000 -> pièce à la 
 test('suppression d\'un devis : devis, STL (base + disque) et gcode effacés ; STL partagé gardé', async () => {
   const carol = new Client();
   carol.csrf = (await carol.req('POST', '/connexion', { email: 'carol@test.local', motdepasse: 'un-mot-de-passe-solide' })).json.csrf;
-  const reglages = { remplissage_pct: 15, couches_surface: 3, proprete: 'fine' };
+  const reglages = { remplissage_pct: 15 };
   const envoyer = async (nom) => (await carol.req('POST', '/fichiers', envoiStl(nom, cube(12)))).json.id;
   const creer = async (fichiers) => (await devisDecoupe(carol, (await carol.req('POST', '/devis', { imprimante_id: 'kobra-1', reglages,
     pieces: fichiers.map((id) => ({ fichier_id: id, quantite: 1 })) })).json.id));
@@ -567,7 +578,7 @@ async function clientDirect(email) {
 
 test('galerie : l\'auteur publie un projet validé sous un pseudo, un autre client le choisit tel quel ou l\'ouvre dans l\'atelier', async () => {
   const auteur = await clientDirect('auteur@test.local');
-  const reglages = { remplissage_pct: 20, couches_surface: 4, proprete: 'fine' };
+  const reglages = { remplissage_pct: 20 };
   const f = await auteur.req('POST', '/fichiers', envoiStl('support-velo.stl', cube(15)));
   const d = await devisDecoupe(auteur, (await auteur.req('POST', '/devis', { imprimante_id: 'kobra-1', reglages,
     pieces: [{ fichier_id: f.json.id, quantite: 3 }] })).json.id);
@@ -690,7 +701,7 @@ test('noms de fichiers accentués : lus en UTF-8 à l\'envoi, anciens noms mal d
 
 test('pièce presque aussi grande que le plateau : refusée avant la découpe (bordures comprises)', async () => {
   const c = await clientDirect('marges@test.local');
-  const reglages = { remplissage_pct: 15, couches_surface: 3, proprete: 'fine' };
+  const reglages = { remplissage_pct: 15 };
   const f = await c.req('POST', '/fichiers', envoiStl('long.stl', cube(10)));
   const devis = (echelle) => c.req('POST', '/devis', { imprimante_id: 'kobra-1', reglages, pieces: [{ fichier_id: f.json.id, quantite: 1, echelle }] });
   assert.equal((await devis(23.8)).json.erreur, 'piece_trop_grande', '238 mm sur un plateau de 250 : refusée (cas du dragon)');
@@ -701,7 +712,7 @@ test('pièce presque aussi grande que le plateau : refusée avant la découpe (b
 
 test('suppression du compte : le devis rattaché à une commande impayée est effacé lui aussi, sans orphelin', async () => {
   const c = await clientDirect('orphelin@test.local');
-  const reglages = { remplissage_pct: 15, couches_surface: 3, proprete: 'fine' };
+  const reglages = { remplissage_pct: 15 };
   const f = await c.req('POST', '/fichiers', envoiStl('cube.stl', cube(20)));
   const d = await devisDecoupe(c, (await c.req('POST', '/devis', { imprimante_id: 'kobra-1', reglages,
     pieces: [{ fichier_id: f.json.id, quantite: 1 }] })).json.id);

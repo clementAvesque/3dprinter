@@ -16,7 +16,6 @@ const STATUTS_PLAQUE = {
   a_envoyer: ['à envoyer à l\'imprimante', 'warn'], a_faire: ['à faire', 'accent'], en_impression: ['en cours d\'impression', 'accent'],
   imprimee: ['imprimée · à valider', 'warn'], validee: ['validée', 'ok'], annulee: ['annulée', ''],
 };
-const PROPRETES = { fine: 'Fine 0,2 mm + lissage', rapide: 'Rapide 0,28 mm' };
 const euros = (cts) => (cts == null ? '—' : `${(cts / 100).toFixed(2).replace('.', ',')} €`);
 const date = (ms) => (ms ? new Date(ms).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—');
 const jours = (ms) => (ms ? Math.ceil((ms - Date.now()) / 864e5) : null);
@@ -105,7 +104,8 @@ async function ouvrirCommande(id) {
   const a = c.livraison_adresse || {};
   $('c-adresse').textContent = [c.livraison_nom, a.ligne1, a.ligne2, `${a.code_postal || ''} ${a.ville || ''}`.trim(), a.pays].filter(Boolean).join(', ');
   const rg = c.devis.reglages;
-  $('c-reglages').textContent = `Remplissage ${rg.remplissage_pct} % · ${rg.couches_surface} couches de surface · ${PROPRETES[rg.proprete]}`;
+  // seul réglage du client ; le reste vient du profil Orca du serveur (ISO 2768-m)
+  $('c-reglages').textContent = `Remplissage ${rg.remplissage_pct} %`;
   // un bloc par devis (commande groupée : plusieurs devis = plusieurs plateaux, une seule livraison)
   const liste = c.devis_liste?.length ? c.devis_liste : [c.devis];
   const payee = !['en_attente_paiement', 'abandonnee'].includes(c.statut);

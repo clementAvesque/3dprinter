@@ -1,6 +1,6 @@
 {
   "type": "filament",
-  "name": "Anycubic PLA @Anycubic Kobra 3 0.4 nozzle",
+  "name": "Anycubic PLA High Speed @Anycubic Kobra 3 0.4 nozzle",
   "from": "User",
   "activate_air_filtration": [
     "0"
@@ -18,7 +18,7 @@
     "0"
   ],
   "close_fan_the_first_x_layers": [
-    "2"
+    "1"
   ],
   "compatible_printers_condition": "",
   "compatible_prints": [],
@@ -42,7 +42,7 @@
     "1"
   ],
   "enable_pressure_advance": [
-    "0"
+    "1"
   ],
   "eng_plate_temp": [
     "0"
@@ -51,13 +51,13 @@
     "0"
   ],
   "fan_cooling_layer_time": [
-    "80"
+    "30"
   ],
   "fan_max_speed": [
     "100"
   ],
   "fan_min_speed": [
-    "100"
+    "85"
   ],
   "filament_cooling_final_speed": [
     "0"
@@ -75,7 +75,7 @@
     "1.24"
   ],
   "filament_deretraction_speed": [
-    "nil"
+    "30"
   ],
   "filament_diameter": [
     "1.75"
@@ -84,7 +84,7 @@
     "; filament end gcode\n"
   ],
   "filament_flow_ratio": [
-    "1.02"
+    "0.98"
   ],
   "filament_is_support": [
     "0"
@@ -102,7 +102,7 @@
     "nil"
   ],
   "filament_max_volumetric_speed": [
-    "22"
+    "19"
   ],
   "filament_minimal_purge_on_wipe_tower": [
     "15"
@@ -123,7 +123,7 @@
     "120 100 6.6 6.8 7.2 7.6 7.9 8.2 8.7 9.4 9.9 10.0| 0.05 6.6 0.45 6.8 0.95 7.8 1.45 8.3 1.95 9.7 2.45 10 2.95 7.6 3.45 7.6 3.95 7.6 4.45 7.6 4.95 7.6"
   ],
   "filament_retract_before_wipe": [
-    "nil"
+    "70%"
   ],
   "filament_retract_lift_above": [
     "nil"
@@ -138,19 +138,19 @@
     "nil"
   ],
   "filament_retract_when_changing_layer": [
-    "nil"
+    "1"
   ],
   "filament_retraction_distances_when_cut": [
     "nil"
   ],
   "filament_retraction_length": [
-    "nil"
+    "0.8"
   ],
   "filament_retraction_minimum_travel": [
-    "nil"
+    "1"
   ],
   "filament_retraction_speed": [
-    "nil"
+    "40"
   ],
   "filament_shrink": [
     "100%"
@@ -180,16 +180,16 @@
     "Anycubic"
   ],
   "filament_wipe": [
-    "nil"
+    "1"
   ],
   "filament_wipe_distance": [
-    "nil"
+    "1.5"
   ],
   "filament_z_hop": [
-    "nil"
+    "0.2"
   ],
   "filament_z_hop_types": [
-    "nil"
+    "Spiral Lift"
   ],
   "full_fan_speed_layer": [
     "3"
@@ -204,13 +204,13 @@
     "0"
   ],
   "nozzle_temperature": [
-    "225"
+    "210"
   ],
   "nozzle_temperature_initial_layer": [
-    "225"
+    "215"
   ],
   "nozzle_temperature_range_high": [
-    "250"
+    "240"
   ],
   "nozzle_temperature_range_low": [
     "190"
@@ -219,10 +219,10 @@
     "100"
   ],
   "overhang_fan_threshold": [
-    "50%"
+    "25%"
   ],
   "pressure_advance": [
-    "0.05"
+    "0.030"
   ],
   "reduce_fan_stop_start_freq": [
     "1"
@@ -234,7 +234,7 @@
     "1"
   ],
   "slow_down_layer_time": [
-    "8"
+    "5"
   ],
   "slow_down_min_speed": [
     "20"
@@ -243,7 +243,7 @@
     "-1"
   ],
   "temperature_vitrification": [
-    "60"
+    "55"
   ],
   "textured_plate_temp": [
     "60"
@@ -251,12 +251,12 @@
   "textured_plate_temp_initial_layer": [
     "60"
   ],
-  "filament_id": "GFPLA",
+  "filament_id": "GFPLA High Speed",
   "is_custom_defined": "0",
-  "version": "1.3.2411.18",
+  "version": "1.3.2501.10",
   "inherits": "",
   "filament_settings_id": [
-    "Anycubic PLA @Anycubic Kobra 3 0.4 nozzle"
+    "Anycubic PLA High Speed @Anycubic Kobra 3 0.4 nozzle"
   ],
   "compatible_printers": [
     "Anycubic Kobra 3 0.4 nozzle"
