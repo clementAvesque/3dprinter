@@ -8,6 +8,7 @@ Chaque action retourne un dict :
 Aucune action ne lance de commande système : seules les méthodes de la librairie sont appelées.
 """
 
+import json
 import mimetypes
 import os
 import sys
@@ -17,6 +18,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from client_printer import Printer, config as lib_config   # noqa: E402
 from client_printer.utils import gcode                     # noqa: E402
+
+# au-delà, la description d'un aperçu 3D part dans le transfert et non dans la réponse JSON (limite du
+# serveur : 64 Ko par message, enveloppe comprise)
+META_INLINE_MAX = 40_000
 
 
 def _res(r, defaut=None):
@@ -150,7 +155,15 @@ class Machine:
                 return _res(r)
             meta, chemin_bin = r
             with open(chemin_bin, "rb") as f:
-                return {"ok": True, "resultat": meta, "octets": f.read(), "mime": "application/octet-stream"}
+                octets = f.read()
+            # description des couches trop grosse pour la réponse JSON (64 Ko au plus, sinon le serveur coupe
+            # la connexion : ~900 Ko pour un gros plateau) -> jointe au transfert, devant les segments.
+            # Le serveur la sépare grâce à sa taille (resultat.meta_jointe, en octets).
+            meta_json = json.dumps(meta, separators=(",", ":")).encode()
+            if len(meta_json) > META_INLINE_MAX:
+                return {"ok": True, "resultat": {"meta_jointe": len(meta_json)}, "octets": meta_json + octets,
+                        "mime": "application/octet-stream"}
+            return {"ok": True, "resultat": meta, "octets": octets, "mime": "application/octet-stream"}
 
         if action == "camera.snapshot":
             pic = pr.camera.instant_pic()

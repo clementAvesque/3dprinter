@@ -33,6 +33,8 @@ from protocole import COMMANDES, LIMITES, valider
 ICI = os.path.dirname(os.path.abspath(__file__))
 ID_RE_MAX = 40
 JSON_INLINE_MAX = 48_000           # au-delà, un résultat part en transfert (morceaux)
+# taille maximale d'un message JSON avant enveloppe (id, seq, ts...) : le serveur coupe au-delà de la limite
+MESSAGE_MAX = LIMITES["message_json_octets"] - 1024
 VIDEO_TAMPON_MAX = 256 * 1024      # octets pas encore partis vers le serveur : au-delà, la vidéo saute des images
 log = logging.getLogger("agent")
 
@@ -91,6 +93,17 @@ class Session:
         return {"v": 1, "id": nouvel_id(), "seq": self.seq_out, "ts": int(time.time() * 1000), **msg}
 
     async def envoyer(self, msg):
+        # un message JSON plus gros que la limite du protocole ferait COUPER la connexion par le serveur (et
+        # échouer toutes les commandes en cours : lancement, aperçu...). Il n'est donc jamais envoyé : une
+        # réponse devient une erreur pour cette commande seule, un événement est abandonné (le suivant passera).
+        texte = json.dumps(msg, separators=(",", ":"))
+        if len(texte.encode()) > MESSAGE_MAX:
+            log.error("message %s/%s trop gros (%d octets) : non envoyé", msg.get("type"),
+                      msg.get("nom") or msg.get("re"), len(texte.encode()))
+            if msg.get("type") != "reponse":
+                return
+            msg = {"type": "reponse", "re": msg.get("re"), "ok": False, "erreur": "resultat_trop_gros",
+                   "detail": "réponse trop grosse pour le protocole"}
         async with self.envoi:
             await self.ws.send(json.dumps(self._enveloppe(msg), separators=(",", ":")))
 
@@ -229,6 +242,12 @@ class Session:
             r = {"ok": False, "erreur": "erreur_agent", "detail": str(e)[:300]}
 
         if r.get("ok") and ("octets" in r or "chemin" in r):
+            # résultat joint trop gros pour un message JSON : le serveur couperait la connexion (et toutes les
+            # commandes en cours avec, dont un lancement d'impression) -> une erreur pour cette commande seule
+            if len(json.dumps(r.get("resultat"))) > JSON_INLINE_MAX:
+                log.error("%s : résultat trop gros pour la réponse, refusé", action)
+                return await self.envoyer({"type": "reponse", "re": re, "ok": False, "erreur": "resultat_trop_gros",
+                                           "detail": f"réponse de {action} trop grosse pour le protocole"})
             return await self.transferer(re, r.get("resultat"), octets=r.get("octets"),
                                          chemin_fichier=r.get("chemin"), mime=r.get("mime"))
         resultat = r.get("resultat")
@@ -236,7 +255,8 @@ class Session:
             return await self.transferer(re, None, octets=json.dumps(resultat).encode(), mime="application/json")
         rep = {"type": "reponse", "re": re, "ok": bool(r.get("ok")), "resultat": resultat}
         if not r.get("ok"):
-            rep.update(erreur=r.get("erreur"), detail=r.get("detail"))
+            detail = r.get("detail")
+            rep.update(erreur=r.get("erreur"), detail=detail if detail is None else str(detail)[:2000])
         await self.envoyer(rep)
 
     # -------------------------------------------------------- gcode reçu du serveur

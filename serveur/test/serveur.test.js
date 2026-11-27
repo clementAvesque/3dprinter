@@ -112,6 +112,14 @@ class FauxAgent {
     if (action === 'file.upload') return;                          // réponse quand le dernier morceau arrive
     if (action === 'file.thumbnail') return this.transferer(id, null, Buffer.from('PNG-miniature'), 'image/png');
     if (action === 'record.download') return this.transferer(id, null, Buffer.alloc(2.5 * 1024 * 1024, 7), 'video/mp4');
+    if (action === 'file.toolpath') {
+      // petit aperçu : description dans la réponse ; gros plateau (nouvel agent) : description jointe au transfert
+      const meta = { layers: params.fichier === 'gros.gcode' ? Array.from({ length: 20000 }, (_, i) => [i, i * 9]) : [[0, 0]], segments: 2 };
+      const seg = Buffer.from('SEGMENTS');
+      if (params.fichier !== 'gros.gcode') return this.transferer(id, meta, seg, 'application/octet-stream');
+      const m = Buffer.from(JSON.stringify(meta));
+      return this.transferer(id, { meta_jointe: m.length }, Buffer.concat([m, seg]), 'application/octet-stream');
+    }
     if (action === 'files.list') return this.envoyer({ type: 'reponse', re: id, ok: true, resultat: [{ nom: 'piece.gcode', taille_octets: 10 }] });
     if (action === 'camera.stream') {
       clearInterval(this.videoTimer);
@@ -365,6 +373,18 @@ test('miniature transférée puis gardée en cache', async () => {
   const n = agent.commandes.length;
   await admin.req('GET', '/machines/kobra-1/files/piece.gcode/thumbnail');
   assert.equal(agent.commandes.length, n, 'pas de 2e demande à l\'agent');
+});
+
+test('aperçu 3D : description dans la réponse, ou jointe au transfert pour un gros plateau', async () => {
+  for (const [fichier, couches] of [['petit.gcode', 1], ['gros.gcode', 20000]]) {
+    const meta = await admin.req('GET', `/machines/kobra-1/files/${fichier}/toolpath`);
+    assert.equal(meta.statut, 200, JSON.stringify(meta.json));
+    assert.equal(meta.json.layers.length, couches);
+    assert.equal(meta.json.segments, 2);
+    const bin = await admin.req('GET', `/machines/kobra-1/files/${fichier}/toolpath-bin`);
+    assert.equal(Buffer.from(await bin.res.arrayBuffer()).toString(), 'SEGMENTS', 'segments seuls, sans la description');
+  }
+  assert.equal(srv.hub.lien !== null, true, 'agent toujours connecté');
 });
 
 test('vidéo enregistrée téléchargée en flux (2,5 Mo)', async () => {

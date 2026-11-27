@@ -312,8 +312,21 @@ function creerApi({ config, db, hub, journal, courriel = creerCourriel(config), 
     if (fs.existsSync(bin) && (!meta || fs.existsSync(meta))) return { bin, meta };
     const r = await hub.commande(m.id, action, { fichier: nom }, { user: qui(req) });
     if (!r.ok) return { r };
-    await fs.promises.writeFile(bin, r.octets || Buffer.alloc(0));
-    if (meta) await fs.promises.writeFile(meta, JSON.stringify(r.resultat));
+    let octets = r.octets || Buffer.alloc(0), resultat = r.resultat;
+    // aperçu 3D d'un gros plateau : l'agent joint la description des couches au transfert, devant les segments
+    // (trop grosse pour sa réponse JSON). resultat.meta_jointe = sa taille en octets.
+    const jointe = resultat?.meta_jointe;
+    if (meta && jointe !== undefined) {
+      if (!Number.isInteger(jointe) || jointe < 2 || jointe > octets.length) {
+        throw new ErreurHub(502, 'apercu_invalide', 'description de l\'aperçu jointe invalide');
+      }
+      try { resultat = JSON.parse(octets.subarray(0, jointe).toString('utf8')); } catch {
+        throw new ErreurHub(502, 'apercu_invalide', 'description de l\'aperçu illisible');
+      }
+      octets = octets.subarray(jointe);
+    }
+    await fs.promises.writeFile(bin, octets);
+    if (meta) await fs.promises.writeFile(meta, JSON.stringify(resultat));
     else await fs.promises.writeFile(`${bin}.mime`, r.mime || 'image/png');
     return { bin, meta };
   }
