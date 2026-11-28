@@ -8,7 +8,14 @@
 const fs = require('node:fs');
 const readline = require('node:readline');
 
-const VERSION = 1;
+const VERSION = 2;    // 2 : couches découpées sur ;LAYER_CHANGE (invalide le cache de métadonnées)
+
+// Une couche commence au marqueur ;LAYER_CHANGE du slicer. Dès qu'un marqueur a été vu, le Z n'est PLUS
+// un critère : certains gcode font monter Z en continu pendant l'extrusion (jusqu'à une hauteur de couche
+// entière à l'intérieur d'une seule couche), ce qui ouvrait une couche par segment — 52988 au lieu de 163
+// sur la plaque P0013. Aucun seuil ne sépare ces cas, seul le marqueur est fiable.
+// Le seuil ci-dessous ne sert qu'aux gcode sans aucun marqueur (repli).
+const SEUIL_COUCHE = 0.02;
 
 const TYPES = ['Paroi externe', 'Paroi interne', 'Remplissage', 'Remplissage plein',
   'Surface dessus/dessous', 'Support', 'Jupe / bordure', 'Autre'];
@@ -72,7 +79,7 @@ async function lireGcode(chemin) {
   const couches = [];                     // [z, debut, nombre]
   const stats = { poids_g: null, duree_s: null, couches_annoncees: null, filament_mm: null, densite: null, diametre: null };
 
-  let x = 0, y = 0, z = 0, e = 0, absXYZ = true, absE = false, t = AUTRE, zCouche = null;
+  let x = 0, y = 0, z = 0, e = 0, absXYZ = true, absE = false, t = AUTRE, zCouche = null, marqueurCouche = false, marqueurVu = false;
   let ax = null, ay = null, px = null, py = null;          // dernier point émis / point en attente
   let xmin = 1e9, ymin = 1e9, xmax = -1e9, ymax = -1e9;
   const c100 = (v) => Math.max(-32768, Math.min(32767, Math.round(v * 100)));
@@ -88,6 +95,10 @@ async function lireGcode(chemin) {
           if (px !== null) { emettre(ax, ay, px, py); ax = px; ay = py; px = py = null; }
           t = nouveau;
         }
+        continue;
+      }
+      if (ligne.startsWith(';LAYER_CHANGE') || ligne.startsWith(';LAYER:') || ligne.startsWith(';CHANGE_LAYER')) {
+        marqueurCouche = marqueurVu = true;
         continue;
       }
       // commentaires du slicer : poids, durée, couches (on garde la première valeur trouvée)
@@ -120,12 +131,13 @@ async function lireGcode(chemin) {
       }
       const bouge = nx !== x || ny !== y;
       if (de > 0 && bouge) {
-        if (zCouche === null || Math.abs(nz - zCouche) > 1e-3) {
+        if (zCouche === null || marqueurCouche || (!marqueurVu && Math.abs(nz - zCouche) > SEUIL_COUCHE)) {
           if (px !== null) emettre(ax, ay, px, py);
           px = py = null;
           if (couches.length) couches[couches.length - 1][2] = types.n - couches[couches.length - 1][1];
           couches.push([Math.round(nz * 1000) / 1000, types.n, 0]);
           zCouche = nz;
+          marqueurCouche = false;
           ax = ay = null;
         }
         const points = (cmd === 'G2' || cmd === 'G3') && ci !== null && cj !== null ? arc(x, y, nx, ny, ci, cj, cmd === 'G2') : [[nx, ny]];

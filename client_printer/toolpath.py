@@ -22,7 +22,14 @@ import os
 import sys
 import threading
 
-VERSION = 1     # à incrémenter si le format change (invalide le cache)
+VERSION = 2     # à incrémenter si le format change (invalide le cache)
+                # 2 : couches découpées sur ;LAYER_CHANGE
+
+# Une couche commence au marqueur ;LAYER_CHANGE du slicer. Dès qu'un marqueur a été vu, le Z n'est PLUS un
+# critère : certains gcode font monter Z en continu pendant l'extrusion (jusqu'à une hauteur de couche entière
+# dans une seule couche), ce qui ouvrait une couche par segment — 52988 au lieu de 163 sur la plaque P0013.
+# Le seuil ci-dessous ne sert qu'aux gcode sans aucun marqueur (repli).
+SEUIL_COUCHE = 0.02
 
 # catégories affichées (l'ordre = l'indice stocké dans le .bin)
 TYPES = ["Paroi externe", "Paroi interne", "Remplissage", "Remplissage plein",
@@ -75,6 +82,8 @@ def parse(path):
     abs_e = False
     t = AUTRE
     layer_z = None
+    marqueur_couche = False
+    marqueur_vu = False
 
     ax = ay = None              # dernier point émis de la polyligne en cours
     px = py = None              # point en attente (pas encore émis, segment trop court)
@@ -96,6 +105,8 @@ def parse(path):
                             emit(ax, ay, px, py)
                             ax, ay, px, py = px, py, None, None
                         t = nouveau
+                elif line.startswith((";LAYER_CHANGE", ";LAYER:", ";CHANGE_LAYER")):
+                    marqueur_couche = marqueur_vu = True
                 continue
             if c0 not in ("G", "M"):
                 continue
@@ -134,7 +145,7 @@ def parse(path):
                 bouge = nx != x or ny != y
                 if de > 0 and bouge:
                     # --- extrusion ---
-                    if layer_z is None or abs(nz - layer_z) > 1e-3:
+                    if layer_z is None or marqueur_couche or (not marqueur_vu and abs(nz - layer_z) > SEUIL_COUCHE):
                         if px is not None:
                             emit(ax, ay, px, py)
                         px = py = None
@@ -142,6 +153,7 @@ def parse(path):
                             layers[-1][2] = len(types) - layers[-1][1]
                         layers.append([round(nz, 3), len(types), 0])
                         layer_z = nz
+                        marqueur_couche = False
                         ax = ay = None
 
                     # chemin : une ligne, ou un arc découpé en petits morceaux
