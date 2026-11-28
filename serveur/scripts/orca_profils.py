@@ -139,7 +139,7 @@ REGLAGES = {
             "top_surface_acceleration": "3500",
             "bridge_acceleration": "2500",
             "initial_layer_acceleration": "1200",
-            "travel_acceleration": "9000",
+            "travel_acceleration": "10000",  # comme les profils Standard d'Anycubic (9000 au départ)
             "accel_to_decel_enable": "1",
             "accel_to_decel_factor": "50%",
             "default_jerk": "0",
