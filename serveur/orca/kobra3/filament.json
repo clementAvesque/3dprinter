@@ -144,13 +144,13 @@
     "nil"
   ],
   "filament_retraction_length": [
-    "0.8"
+    "1.2"
   ],
   "filament_retraction_minimum_travel": [
     "1"
   ],
   "filament_retraction_speed": [
-    "40"
+    "50"
   ],
   "filament_shrink": [
     "100%"
@@ -204,10 +204,10 @@
     "0"
   ],
   "nozzle_temperature": [
-    "210"
+    "205"
   ],
   "nozzle_temperature_initial_layer": [
-    "215"
+    "210"
   ],
   "nozzle_temperature_range_high": [
     "240"

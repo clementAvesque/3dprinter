@@ -97,7 +97,10 @@ async function main() {
     }
     return couches;
   };
-  // buse : 215 °C pour la 1re couche (G9111 de la Kobra 3 au démarrage), puis 210 (M104/M109), 0 à la fin
+  // buse : température 1re couche du profil (G9111 de la Kobra 3 au démarrage), puis la normale (M104/M109),
+  // 0 à la fin. Valeurs lues dans le profil filament (scripts/orca_profils.py) pour suivre ses réglages.
+  const fil = JSON.parse(fs.readFileSync(path.join(config.orca.profils, 'kobra3', 'filament.json'), 'utf8'));
+  const T1 = Number(fil.nozzle_temperature_initial_layer[0]), T = Number(fil.nozzle_temperature[0]);
   const buses = (id) => {
     const g = gcode(id);
     return [...g.matchAll(/^G9111 .*extruderTemp=(\d+)/gm), ...g.matchAll(/^M10[49] S(\d+)/gm)].map((m) => Number(m[1])).filter((t) => t !== 0);
@@ -124,10 +127,10 @@ async function main() {
       console.error('[essai-orca]   ÉCHEC : pièces mal rangées (superposées ou hors du plateau)');
     }
     const b = buses(id);
-    if (b[0] !== 215 || !b.includes(210) || b.some((t) => t !== 215 && t !== 210)) {
+    if (b[0] !== T1 || !b.includes(T) || b.some((t) => t !== T1 && t !== T)) {
       ok = false;
-      console.error(`[essai-orca]   ÉCHEC : buse à ${b.join(', ')} °C au lieu de 215 puis 210 °C`);
-    } else console.log(`[essai-orca]   plateau ${plateau(id)} °C, buse ${b[0]} puis 210 °C`);
+      console.error(`[essai-orca]   ÉCHEC : buse à ${b.join(', ')} °C au lieu de ${T1} puis ${T} °C`);
+    } else console.log(`[essai-orca]   plateau ${plateau(id)} °C, buse ${b[0]} puis ${T} °C`);
     // vitesses du profil ISO 2768-m : 1re couche 100 mm/s au plus, le reste 280 au plus
     const v = vitesses(id);
     const max1 = Math.max(...v[0]), max = Math.max(...v.flatMap((s) => [...s]));

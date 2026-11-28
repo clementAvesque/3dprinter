@@ -148,9 +148,10 @@ REGLAGES = {
             "max_travel_detour_distance": "0",
             "exclude_object": "1",
         },
-        # PLA Haute Vitesse : 215 °C la 1re couche puis 210, débit x0,98, 19 mm³/s au plus, avance de pression 0,03.
+        # PLA Haute Vitesse : 210 °C la 1re couche puis 205, débit x0,98, 19 mm³/s au plus, avance de pression 0,03.
         # Ventilateur coupé sur la 1re couche, 85-100 % dès la 3e. Rétraction (prioritaire sur celle de la
-        # machine) : 0,8 mm à 40 mm/s, levée en spirale de 0,2 mm, essuyage de 1,5 mm, à chaque changement de couche.
+        # machine) : 1,2 mm à 50 mm/s, levée en spirale de 0,2 mm, essuyage de 1,5 mm, à chaque changement de couche.
+        # (210 °C et 0,8 mm à 40 mm/s au départ : fils d'ange entre les pièces, d'où 205 °C et 1,2 mm à 50 mm/s.)
         "filament": {
             "filament_type": ["PLA"],
             "filament_diameter": ["1.75"],
@@ -159,8 +160,8 @@ REGLAGES = {
             "filament_max_volumetric_speed": ["19"],
             "filament_shrink": ["100%"],
             "temperature_vitrification": ["55"],
-            "nozzle_temperature": ["210"],
-            "nozzle_temperature_initial_layer": ["215"],
+            "nozzle_temperature": ["205"],
+            "nozzle_temperature_initial_layer": ["210"],
             "nozzle_temperature_range_low": ["190"],
             "nozzle_temperature_range_high": ["240"],
             "hot_plate_temp": ["60"],
@@ -180,8 +181,8 @@ REGLAGES = {
             "slow_down_for_layer_cooling": ["1"],
             "slow_down_layer_time": ["5"],
             "slow_down_min_speed": ["20"],
-            "filament_retraction_length": ["0.8"],
-            "filament_retraction_speed": ["40"],
+            "filament_retraction_length": ["1.2"],
+            "filament_retraction_speed": ["50"],
             "filament_deretraction_speed": ["30"],
             "filament_retract_before_wipe": ["70%"],
             "filament_wipe": ["1"],
