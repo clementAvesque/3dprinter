@@ -106,6 +106,7 @@ function afficherEtat(e, enLigne) {
   $('t-lit').textContent = t(e.bed?.temperature);
   const u = p?.filament?.utilise;
   $('fil').textContent = imprime && u?.emplacement ? `fil : emplacement ${u.emplacement}${u.matiere ? ` · ${u.matiere}` : ''}` : '';
+  afficherEnregistrement(e.enregistrement, e.dernier_enregistrement);
 
   $('btn-pause').disabled = e.state !== 'PRINTING';
   $('btn-reprise').disabled = e.state !== 'BREAK';
@@ -113,6 +114,21 @@ function afficherEtat(e, enLigne) {
   remplirEmplacements(e.ace?.fils);
   majOccupation();
   afficherReglages(e, imprime);
+}
+
+// enregistrement vidéo de l'agent : en cours (nombre d'images), ou erreur du dernier
+function afficherEnregistrement(rec, dernier) {
+  const el = $('pr-video');
+  let texte = '';
+  if (rec?.recording) {
+    texte = rec.timelapse
+      ? `● Enregistrement vidéo : ${rec.images ?? 0} image${rec.images > 1 ? 's' : ''} (1 toutes les ${rec.timelapse} s)`
+      : `● Enregistrement vidéo en cours (${duree(rec.duree)})`;
+  } else if (dernier?.error) {
+    texte = `Enregistrement vidéo impossible : ${dernier.error}${dernier.detail ? ` (${dernier.detail})` : ''}`;
+  }
+  el.textContent = texte;
+  el.hidden = !texte;
 }
 
 // ---------------------------------------------------------------- ACE, températures, mouvements, réglages
@@ -403,12 +419,26 @@ $('recherche').addEventListener('input', afficherFichiers);
 
 // ---------------------------------------------------------------- impression
 
+// case « Enregistrer l'impression en vidéo » : le dernier choix est gardé sur cet appareil
+const CLE_ENREGISTRER = 'enregistrer-impression';
+$('fiche-enregistrer').checked = localStorage.getItem(CLE_ENREGISTRER) === '1';
+
 $('btn-imprimer').addEventListener('click', async () => {
   if (!choisi) return;
   const nom = choisi;
   const corps = { fichier: nom };
   if ($('emplacement').value) corps.emplacement = Number($('emplacement').value);
   $('btn-imprimer').disabled = true;
+  // enregistrement vidéo : l'agent le démarre tout seul quand l'impression commence et l'arrête à la fin.
+  // Réglé juste avant le lancement ; ce choix reste valable pour les impressions lancées depuis l'écran.
+  const enregistrer = $('fiche-enregistrer').checked;
+  localStorage.setItem(CLE_ENREGISTRER, enregistrer ? '1' : '0');
+  const a = await api('PUT', `/machines/${encodeURIComponent(machine)}/recordings/auto`,
+    enregistrer ? { actif: true, timelapse: 5 } : { actif: false });
+  if (!a.ok) {
+    $('btn-imprimer').disabled = false;
+    return toast(`Enregistrement vidéo : ${texteErreur(a.json)}`, true);
+  }
   const r = await api('POST', `/machines/${encodeURIComponent(machine)}/print`, corps);
   $('btn-imprimer').disabled = false;
   if (!r.ok) return toast(texteErreur(r.json), true);

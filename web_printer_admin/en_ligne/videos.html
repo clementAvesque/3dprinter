@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Vidéos · Imprimantes</title>
+  <meta name="theme-color" content="#1a1d23">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icones/icone.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icones/apple-touch-icon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="barre">
+  <div class="marque">
+    <span id="point" class="point"></span>
+    <div>
+      <h1>Imprimantes</h1>
+      <span id="agent-etat" class="muted small">connexion…</span>
+    </div>
+  </div>
+  <nav class="nav">
+    <a href="index.html">Imprimer</a>
+    <a href="suivi.html">Suivi 3D</a>
+    <a href="galerie.html">Galerie</a>
+    <a href="videos.html" class="actif" aria-current="page">Vidéos</a>
+    <a href="boutique.html">Boutique</a>
+  </nav>
+  <select id="machine" title="machine" hidden></select>
+  <span id="badge" class="badge">…</span>
+  <a id="utilisateur" class="small lien-profil" href="profil.html" title="Mon profil"></a>
+  <button id="deconnexion" class="fantome">Se déconnecter</button>
+</header>
+
+<main class="galerie">
+
+  <section class="resume">
+    <div class="tuile"><span class="muted small">Vidéos</span><b id="r-nb">—</b></div>
+    <div class="tuile"><span class="muted small">Place prise sur le Raspberry</span><b id="r-taille">—</b></div>
+    <div class="tuile"><span class="muted small">Enregistrement</span><b id="r-etat">—</b></div>
+  </section>
+
+  <div class="barre-outils">
+    <input id="recherche" type="search" class="grow" placeholder="Rechercher une vidéo…" autocomplete="off">
+    <button id="btn-actualiser" class="fantome">Actualiser</button>
+  </div>
+
+  <div id="videos" class="cartes videos"><p class="muted">Chargement…</p></div>
+
+  <p class="muted small">Les vidéos sont enregistrées par l'agent, sur le Raspberry, quand la case « Enregistrer
+    l'impression en vidéo » est cochée au lancement. Une photo toutes les 5 s, rejouées à 30 images par seconde :
+    1 h d'impression donne environ 24 s de vidéo.</p>
+
+</main>
+
+<!-- lecture d'une vidéo -->
+<dialog id="lecteur" class="lecteur">
+  <div class="card-tete">
+    <h2 id="l-titre">Vidéo</h2>
+    <button id="l-fermer" class="fantome" aria-label="Fermer">✕</button>
+  </div>
+  <video id="l-video" controls playsinline preload="auto"></video>
+  <p id="l-infos" class="muted small"></p>
+  <div class="row fin">
+    <a id="l-telecharger" class="bouton" download>Télécharger</a>
+  </div>
+</dialog>
+
+<!-- confirmation de suppression -->
+<dialog id="suppression">
+  <form method="dialog">
+    <h2>Supprimer cette vidéo ?</h2>
+    <p id="s-nom" class="fichier-en-cours"></p>
+    <p class="muted small">Elle est effacée du Raspberry. C'est définitif.</p>
+    <div class="row fin">
+      <button value="non" class="fantome">Annuler</button>
+      <button value="oui" class="danger plein">Supprimer</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- code 2FA redemandé pour les actions sensibles (commun.js) -->
+<dialog id="confirmation">
+  <form id="conf-form" method="dialog">
+    <h2>Confirme avec ton code</h2>
+    <p class="muted small">Action sensible : saisis le code à 6 chiffres de ton application.</p>
+    <input id="conf-code" class="code" inputmode="numeric" autocomplete="one-time-code" maxlength="20" required>
+    <p id="conf-erreur" class="message erreur" hidden></p>
+    <div class="row">
+      <button type="button" class="fantome grow" id="conf-annuler">Annuler</button>
+      <button class="primaire grow" value="ok">Confirmer</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="toasts" class="toasts"></div>
+<script src="config.js"></script>
+<script src="commun.js"></script>
+<script src="machine.js"></script>
+<script src="videos.js"></script>
+</body>
+</html>

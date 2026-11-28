@@ -25,6 +25,7 @@
     <a href="index.html" class="actif" aria-current="page">Imprimer</a>
     <a href="suivi.html">Suivi 3D</a>
     <a href="galerie.html">Galerie</a>
+    <a href="videos.html">Vidéos</a>
     <a href="boutique.html">Boutique</a>
   </nav>
   <select id="machine" title="machine" hidden></select>
@@ -56,6 +57,7 @@
       <span id="fil" class="muted small"></span>
     </div>
     <p id="pr-fichier" class="fichier-en-cours">Aucune impression</p>
+    <p id="pr-video" class="muted small" hidden></p>
     <div class="progression"><div id="pr-barre"></div></div>
     <div class="stats">
       <div>Avancement<b id="pr-pct">—</b></div>
@@ -237,6 +239,7 @@
         <span class="muted small">Plastique à utiliser (emplacement de l'ACE)</span>
         <select id="emplacement"></select>
       </label>
+      <label class="case small"><input id="fiche-enregistrer" type="checkbox"> Enregistrer l'impression en vidéo (1 image toutes les 5 s)</label>
       <p id="fiche-conseil" class="small conseil" hidden></p>
       <p id="fiche-occupee" class="small conseil alerte" hidden>L'imprimante est déjà en train d'imprimer.</p>
       <button id="btn-imprimer" class="primaire">Imprimer</button>
