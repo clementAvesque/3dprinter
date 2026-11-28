@@ -10,6 +10,7 @@ class Ace:
         # tableau d'objets : [{"color": "#rrggbb" ou None si vide, "emplacement": 1..4, "matiere": "PLA"...}]
         self.fils = None
         self.slot_actif = None  # emplacement (1..4) dont le fil est chargé dans la tête, sinon None
+        self.fil_present = False  # le capteur de la tête voit du fil
         self.state = State()  # "DRY" si séchage, "ON" si allumé, "OFF" si absent
         self.url = url
         self.query = {"filament_hub": None}     # ce que l'ACE lit sur Klipper (None = tout)
@@ -53,7 +54,10 @@ class Ace:
             self.state.OFF()
             return self.fils
 
-        # fil chargé dans la tête : "0-2" = ACE 0, emplacement d'indice 2 (donc le 3), "" = aucun
+        # capteur de fil de la tête : True si du fil y est (même si l'ACE ne sait pas d'où il vient)
+        self.fil_present = bool(hub.get("filament_present"))
+        # fil chargé dans la tête : "0-2" = ACE 0, emplacement d'indice 2 (donc le 3), "" = aucun ou inconnu
+        # (l'ACE l'oublie au redémarrage de l'imprimante : le capteur voit encore du fil, current_filament est vide)
         try:
             self.slot_actif = int(str(hub.get("current_filament") or "").split("-")[1]) + 1
         except (IndexError, ValueError):

@@ -741,6 +741,18 @@ class Printer:
         if erreur:
             return erreur
 
+        # vérifié AVANT de chauffer ou de reculer quoi que ce soit : l'ACE ne rembobine que le fil qu'il sait
+        # chargé (sinon « unknown filament in extruder », une fois le fil déjà reculé de `length` mm)
+        if slot is not None:
+            actif = self.ace.slot_actif
+            if actif is None and self.ace.fil_present:
+                return {"error": "l'ACE ne sait pas de quel emplacement vient le fil de la tête (oublié au "
+                                 "redémarrage de l'imprimante)",
+                        "detail": "choisis « sans ACE » pour seulement reculer le fil de la tête, puis retire-le "
+                                  "à la main, ou décharge depuis l'écran de l'imprimante"}
+            if actif is not None and actif != slot:
+                return {"error": f"le fil chargé vient de l'emplacement {actif}, pas du {slot}"}
+
         res = self.nozzle.set_target_temp(temp, wait=True)
         if res.get("error"):
             return res
