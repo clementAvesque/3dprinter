@@ -756,6 +756,23 @@ class Printer:
 
         return self.nozzle.stop()
 
+    def move_filament(self, longueur, temp=215, vitesse=5):
+        # fait avancer (longueur > 0, extrusion) ou reculer (longueur < 0, rétraction) le filament dans la tête,
+        # sans passer par l'ACE : purger, amorcer, dégager un bout de fil. Buse froide : chauffée à `temp`
+        # d'abord ; déjà assez chaude : sa température n'est pas touchée. La buse reste chaude à la fin.
+        erreur = self._idle_error()
+        if erreur:
+            return erreur
+        if not longueur:
+            return {"error": "longueur nulle"}
+        if not self.nozzle.can_extrude():
+            res = self.nozzle.set_target_temp(temp, wait=True)
+            if res.get("error"):
+                return res
+        if longueur > 0:
+            return self.nozzle.extrude(longueur, speed=vitesse)
+        return self.nozzle.retract(-longueur, speed=vitesse)
+
     # ----- infos -----------------------------------------------------------
 
     def filament(self):

@@ -203,6 +203,7 @@ function creerApi({ config, db, hub, journal, courriel = creerCourriel(config), 
   commande('put', '/machines/:m/light', 'light.set');
   commande('post', '/machines/:m/filament/load', 'filament.load');
   commande('post', '/machines/:m/filament/unload', 'filament.unload');
+  commande('post', '/machines/:m/filament/extrude', 'filament.extrude');
   commande('post', '/machines/:m/ace/dry', 'ace.dry.start');
   commande('delete', '/machines/:m/ace/dry', 'ace.dry.stop');
   commande('post', '/machines/:m/gcode', 'gcode.raw');

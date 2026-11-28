@@ -1,7 +1,7 @@
 // Service worker de la PWA admin : rend l'application installable et garde ses fichiers pour un
 // démarrage rapide. L'API (/api/...) n'est JAMAIS mise en cache : état des machines, commandes et
 // sessions viennent toujours du serveur.
-const VERSION = 'admin-v7';
+const VERSION = 'admin-v8';
 const FICHIERS = [
   'index.html', 'suivi.html', 'galerie.html', 'boutique.html', 'bon.html', 'profil.html', 'connexion.html',
   'style.css', 'config.js', 'commun.js', 'machine.js', 'filament.js', 'app.js', 'suivi.js', 'galerie.js',

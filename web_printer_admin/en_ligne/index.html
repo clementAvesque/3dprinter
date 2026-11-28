@@ -169,7 +169,22 @@
       <button id="btn-charger">⤓ Charger</button>
       <button id="btn-decharger">⤒ Décharger</button>
     </div>
-    <p class="muted small">La buse chauffe à la température indiquée avant de charger ou décharger. Refusé pendant une impression.</p>
+    <div class="row">
+      <div id="fil-longueur" class="segments" title="longueur de filament">
+        <button type="button" data-longueur="5">5</button>
+        <button type="button" data-longueur="10" class="actif">10</button>
+        <button type="button" data-longueur="50">50</button>
+        <button type="button" data-longueur="100">100</button>
+      </div>
+      <span class="muted small grow">mm</span>
+    </div>
+    <div class="row">
+      <button id="btn-extruder">↓ Extruder</button>
+      <button id="btn-retracter">↑ Rétracter</button>
+    </div>
+    <p class="muted small">Charger / décharger passent par l'ACE. Extruder / rétracter ne font bouger que le moteur de la tête,
+      de la longueur choisie (purge, amorçage, fil à dégager). Buse froide : elle chauffe d'abord à la température indiquée.
+      Refusé pendant une impression.</p>
   </section>
 
   <section class="card large">

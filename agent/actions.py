@@ -76,7 +76,7 @@ class Machine:
         """Exécute une action DÉJÀ validée (protocole.valider). Bloquant : appelé dans un thread."""
         pr = self.printer
         limites = self.options.get("limites", {})
-        longues = {"print.start", "move.home", "filament.load", "filament.unload", "files.sync"}
+        longues = {"print.start", "move.home", "filament.load", "filament.unload", "filament.extrude", "files.sync"}
         if action in longues:
             return self._executer(action, p, pr, limites)
         with self.verrou:
@@ -122,6 +122,9 @@ class Machine:
             return _res(pr.load_filament(slot=p.get("emplacement"), temp=p.get("temp", 220)))
         if action == "filament.unload":
             return _res(pr.unload_filament(slot=p.get("emplacement"), temp=p.get("temp", 220)))
+        if action == "filament.extrude":
+            # > 0 : extrusion, < 0 : rétraction (tête seulement, sans l'ACE)
+            return _res(pr.move_filament(p["longueur"], temp=p.get("temp", 215)))
         if action == "ace.dry.start":
             return _res(pr.ace.start_dry(p["temp"], p["duree"]))
         if action == "ace.dry.stop":

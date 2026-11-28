@@ -17,6 +17,7 @@
     "light.set":       {"role": "operateur", "params": {"on": {"type": "booleen"}}},
     "filament.load":   {"role": "operateur", "longue": true,  "params": {"emplacement": {"type": "entier", "min": 1, "max": 4, "optionnel": true}, "temp": {"type": "nombre", "min": 150, "max": 300, "optionnel": true}}},
     "filament.unload": {"role": "operateur", "longue": true,  "params": {"emplacement": {"type": "entier", "min": 1, "max": 4, "optionnel": true}, "temp": {"type": "nombre", "min": 150, "max": 300, "optionnel": true}}},
+    "filament.extrude": {"role": "operateur", "longue": true, "params": {"longueur": {"type": "nombre", "min": -200, "max": 200}, "temp": {"type": "nombre", "min": 150, "max": 300, "optionnel": true}}},
     "ace.dry.start":   {"role": "operateur", "params": {"temp": {"type": "nombre", "min": 30, "max": 70}, "duree": {"type": "entier", "min": 10, "max": 1440}}},
     "ace.dry.stop":    {"role": "operateur", "params": {}},
     "gcode.raw":       {"role": "admin", "confirmation": true, "params": {"script": {"type": "texte", "max": 500, "motif": "^[\\x20-\\x7E\\n]+$"}}},

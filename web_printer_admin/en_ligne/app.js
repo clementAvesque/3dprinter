@@ -520,6 +520,17 @@ const nomSlot = () => ($('fil-slot').value ? `emplacement ${$('fil-slot').value}
 $('btn-charger').addEventListener('click', () => commande('/filament/load', `Chargement (${nomSlot()})`, corpsFilament(), 'POST', $('btn-charger')));
 $('btn-decharger').addEventListener('click', () => commande('/filament/unload', `Déchargement (${nomSlot()})`, corpsFilament(), 'POST', $('btn-decharger')));
 
+// filament : extruder / rétracter de quelques mm (moteur de la tête seulement, sans l'ACE)
+let longueurFil = 10;
+document.querySelectorAll('[data-longueur]').forEach((b) => b.addEventListener('click', () => {
+  longueurFil = Number(b.dataset.longueur);
+  document.querySelectorAll('[data-longueur]').forEach((x) => x.classList.toggle('actif', x === b));
+}));
+for (const [id, sens, nom] of [['btn-extruder', 1, 'Extrusion'], ['btn-retracter', -1, 'Rétraction']]) {
+  $(id).addEventListener('click', () => commande('/filament/extrude', `${nom} de ${longueurFil} mm`,
+    { longueur: sens * longueurFil, temp: Number($('fil-temp').value) }, 'POST', $(id)));
+}
+
 // envoi d'un gcode (barre de progression : XMLHttpRequest, fetch ne la donne pas)
 $('envoi').addEventListener('submit', (ev) => {
   ev.preventDefault();

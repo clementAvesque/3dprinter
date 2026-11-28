@@ -329,6 +329,22 @@ test('commande longue : 202 puis opération suivie', async () => {
   assert.deepEqual(op.json.resultat.params, { fichier: 'piece.gcode', emplacement: 2 });
 });
 
+test('filament : extruder / rétracter quelques mm (longueur signée, bornée)', async () => {
+  for (const longueur of [10, -50]) {
+    const r = await admin.req('POST', '/machines/kobra-1/filament/extrude', { longueur, temp: 215 });
+    assert.equal(r.statut, 202, JSON.stringify(r.json));
+    await attendre(() => srv.hub.operations.get(r.json.operation)?.fin);
+    const cmd = agent.commandes.at(-1);
+    assert.equal(cmd.action, 'filament.extrude');
+    assert.deepEqual(cmd.params, { longueur, temp: 215 });
+  }
+  const avant = agent.commandes.length;
+  for (const corps of [{ longueur: 500 }, { longueur: -201 }, { longueur: '10' }, {}, { longueur: 10, temp: 400 }]) {
+    assert.equal((await admin.req('POST', '/machines/kobra-1/filament/extrude', corps)).statut, 400, JSON.stringify(corps));
+  }
+  assert.equal(agent.commandes.length, avant, 'rien envoyé à l\'agent');
+});
+
 test('rôle insuffisant : un lecteur ne peut pas agir', async () => {
   const secret = await creerCompte('lecteur@test.local', 'lecteur');
   const l = new Client();
